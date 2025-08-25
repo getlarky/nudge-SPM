@@ -3,12 +3,16 @@ import UIKit
 
 public struct KeyValueStore {
     static let id = "id"
-    public static let nudgeLibraryVersion = "4.1.1"
+    public static let nudgeLibraryVersion = "4.1.2"
     public static let devicePlatform = "ios"
     public static let deviceManufacturer = "Apple"
     public static let apiKey = "apiKey"
     public static let nudgeVersion = "nudgeVersion"
-    public static let deviceVersion = UIDevice.current.systemVersion
+    public static var deviceVersion: String {
+        MainActor.assumeIsolated {
+            UIDevice.current.systemVersion
+        }
+    }
     public static let timezoneValue = TimeZone.current.identifier
     public static let userId = "nudgeUserId"
     public static let federationId = "nudgeFederationId"

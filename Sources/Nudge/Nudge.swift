@@ -7,6 +7,8 @@
 
 import Foundation
 import os.log
+import UserNotifications
+import UIKit
 
 private let fileName = "Nudge.swift"
 
@@ -15,7 +17,7 @@ private let fileName = "Nudge.swift"
     var logger = CustomLog()
     var myNudgeVersion: NudgeVersion = NudgeVersion.nudgeLegacy
     
-    public enum NudgeVersion: String {
+    public enum NudgeVersion: String, Sendable {
         case nudgeStandard = "nudgeStandard"
         case nudgeGeo = "nudgeGeo"
         case nudgeLegacy = "nudgeLegacy"
@@ -218,7 +220,7 @@ private let fileName = "Nudge.swift"
         NudgeBase.trackMessageEvent(endpointName: Constants.Core.Endpoints.nudgeReceived, notificationPayload: notificationPayload)
     }
     
-    @available(iOS 10.0, *)
+    @MainActor @available(iOS 10.0, *)
     @objc public static func tappedNotification(notification: UNNotification) {
 //        NudgeAnalytics.pushAnalytics(eventName: NudgeAnalytics.TAPPED_NOTIFICATION, notificationPayload: notification.request.content.userInfo)
         NudgeBase.trackMessageEvent(endpointName: Constants.Core.Endpoints.nudgeTapped, notificationPayload: notification.request.content.userInfo)
@@ -232,6 +234,7 @@ private let fileName = "Nudge.swift"
         }
     }
     
+    @MainActor
     private static func redirectToUrl(messageUrl: String) {
         guard let url = URL(string: messageUrl) else {
             return

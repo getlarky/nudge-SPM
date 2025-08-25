@@ -93,58 +93,22 @@ public struct Constants {
         static let federationId = "federationId"
         static let nudgeVersion = "nudgeVersion"
     }
-//    struct Push {
-//        struct MessageData {
-//            static let messageId = "message_id"
-//            static let messageBody = "message_body"
-//            static let messageTitle = "message_title"
-//            static let messageDescription = "message_description"
-//            static let messageName = "message_name"
-//            static let messageUrl = "message_url"
-//            static let messageSuppress = "message_suppress"
-//            static let messageBreadcrumbs = "breadcrumbs"
-//        }
-//    }
     
-    // renamesd  "Location"
-//    struct Analytics {
-//        static let userLatitude = "user_latitude"
-//        static let userLongitude = "user_longitude"
-//    }
-    
-//    public struct Defaults {
-//        public static let userId = "nudgeUserId"
-//        static let federationId = "nudgeFederationId"
-//        public static let deviceId = "nudgeDeviceId"
-//        static let isAuthenticated = "nudgeIsAuthenticated"
-//        static let coreServerToken = "coreServerToken"
-//        static let pushToken = "nudgePushToken"
-//        public static let organizationId = "nudgeOrganizationId"
-//        public static let email = "nudgeEmail"
-//        public static let organizationName = "nudgeOrganizationName"
-//        public static let userName = "nudgeUserName"
-////        public static let latitude = "nudgeLastLatitude"
-////        public static let longitude = "nudgeLastLongitude"
-//        public static let isNudgeEnabled = "isNudgeEnabled"
-//        public static let APNtoken = "APNtoken"
-//        public static let orgDesiredAccuracy = "orgDesiredAccuracy"
-//        public static let orgDistanceFilter = "orgDistanceFilter"
-//        static let orgAnalyticsApiKey = "orgAnalyticsApiKey"
-//        static let orgTokenDealerSecret = "orgTokenDealerSecret"
-//        public static let showLocationDialog = "showLocationDialog"
-//        public static let orgLocationDialogTitle = "orgLocationDialogTitle"
-//        public static let orgLocationDialogBody = "orgLocationDialogBody"
-//        public static let lastPermissionsPromptTime = "lastPermissionsPromptTime"
-//        public static let howManyTimesPrompted = "howManyTimesPrompted"
-//    }
-    
-//    public struct Headers {
-//        static let authorizationHeader = "Authorization"
-//        static let bearer = "Bearer"
-//        static let applicationJson = "application/json"
-//        static let contentType = "Content-Type"
-//        static let nudgeLibraryVersionHeader = "Nudge-Api-Version"
+//    public typealias SendableParams = [String: SendableValue]?
+//    
+//    public enum SendableValue: Sendable {
+//        case string(String)
+//        case int(Int)
+//        case double(Double)
+//        case bool(Bool)
+//        case dictionary([SendableValue])
+//        case array([SendableValue])
 //    }
     
     public static let dateFormat = "yyyy-MM-dd HH:mm:ss"
+}
+
+
+internal struct Params: @unchecked Sendable {
+    let paramsData: [String:Any]?
 }

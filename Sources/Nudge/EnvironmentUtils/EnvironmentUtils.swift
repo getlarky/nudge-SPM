@@ -10,8 +10,8 @@ import Foundation
 public class EnvironmentUtils {
 
     // default to production environment
-    private static var _env: Environment = Environment.PROD
-    public enum Environment: String {
+    private static let _env: Environment = Environment.PROD
+    public enum Environment: String, Sendable {
         case DEV = "dev"
         case STAGING = "staging"
         case PROD = "prod"
@@ -30,14 +30,14 @@ public class EnvironmentUtils {
         return _env.rawValue
     }
     
-    public static func setEnv(envIn: Environment) {
-        _env = envIn
-    }
-    
-    public static func setEnvByName(rawValueIn: String) {
-        let envIn: Environment? = Environment(rawValue: rawValueIn)
-        _env = envIn ?? Environment.PROD
-    }
+//    public static func setEnv(envIn: Environment) {
+//        _env = envIn
+//    }
+//    
+//    public static func setEnvByName(rawValueIn: String) {
+//        let envIn: Environment? = Environment(rawValue: rawValueIn)
+//        _env = envIn ?? Environment.PROD
+//    }
     
     // return the proper URL given a desired environment and service (i.e. core or tokendealer endpoint)
     public static func getNudgeURL(service: String) -> String {

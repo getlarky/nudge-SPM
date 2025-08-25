@@ -9,14 +9,18 @@ import Foundation
 import os.log
 
 extension OSLog {
-    private static var subsystem = Bundle.main.bundleIdentifier!
+    private static let subsystem: String = {
+        Bundle(for: Nudge.self).bundleIdentifier ?? "com.yourcompany.yourlibrary"
+    }()
 
     static let locationTracking = OSLog(subsystem: subsystem, category: "locationTracking")
     static let nudgeInit = OSLog(subsystem: subsystem, category: "nudgeInit")
     static let nudge = OSLog(subsystem: subsystem, category: "nudge")
+    static let nudgePermissions = OSLog(subsystem: subsystem, category: "nudgePermissions")
+    static let nudgeMessaging = OSLog(subsystem: subsystem, category: "nudgeMessaging")
 }
 
-public class CustomLog : NSObject {
+public final class CustomLog : NSObject, Sendable {
     
     
     public override init() {
@@ -49,6 +53,30 @@ public class CustomLog : NSObject {
     
     public func debug(message: String) {
         os_log("%@", log: OSLog.nudge, type: .debug, message)
+    }
+    
+    public func infoNudgePermissions(message: String) {
+        os_log("%@", log: OSLog.nudgePermissions, type: .info, message)
+    }
+    
+    public func debugNudgePermissions(message: String) {
+        os_log("%@", log: OSLog.nudgePermissions, type: .debug, message)
+    }
+
+    public func errorNudgePermissions(message: String) {
+        os_log("%@", log: OSLog.nudgePermissions, type: .error, message)
+    }
+    
+    public func infoNudgeMessaging(message: String) {
+        os_log("%@", log: OSLog.nudgeMessaging, type: .info, message)
+    }
+    
+    public func debugNudgeMessaging(message: String) {
+        os_log("%@", log: OSLog.nudgeMessaging, type: .debug, message)
+    }
+
+    public func errorNudgeMessaging(message: String) {
+        os_log("%@", log: OSLog.nudgeMessaging, type: .error, message)
     }
     
 }

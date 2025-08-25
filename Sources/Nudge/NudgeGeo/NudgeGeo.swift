@@ -6,7 +6,7 @@ import os.log
 private let fileName = "NudgeGeo.swift"
 
 @objc public class NudgeGeo : NudgeBase {
-    var logger = CustomLog()
+//    var logger = CustomLog()
     
     @objc public init(options: Dictionary<String,Any> = [:], callback: (()->Void)? = nil) {
         super.init()
@@ -77,8 +77,8 @@ private let fileName = "NudgeGeo.swift"
 //        }
 //    }
     
-    override func initializeNudgeSuccess(newDeviceId: String, callback: (()->Void)? = nil) -> Void {
-        logger.infoNudgeInit(message:"=======================NUDGEGEO=======================")
+    override func initializeNudgeSuccess(newDeviceId: String, callback: (@Sendable ()->Void)? = nil) -> Void {
+        NudgeGeo.logger.infoNudgeInit(message:"=======================NUDGEGEO=======================")
         //print("=======================NUDGEGEO=======================")
      //   let deviceId = KeyValueStore.getString(key: KeyValueStore.deviceId)
 //        NudgeAnalytics.setupAnalytics()
@@ -100,7 +100,7 @@ private let fileName = "NudgeGeo.swift"
                 let nudgeVersion = Nudge.NudgeVersion(rawValue: nudgeVersionValue ?? "nudgeGeo")
                 
                 let locationPermissionStatus = KeyValueStore.getString(key: KeyValueStore.locationPermission)
-                
+                print("location: \(locationPermissionStatus)")
                 if ((nudgeVersion == NudgeVersionBridge.nudgeLegacy) || locationPermissionStatus == "Always"){
                     self.registerForLocationServices(callback: callback)
                 }
@@ -165,16 +165,18 @@ private let fileName = "NudgeGeo.swift"
 //        // call to new federationId endpoint goes here
 //    }
     
-    public func registerForLocationServices(callback: (()->Void)? = nil) {
+    public func registerForLocationServices(callback: (@Sendable ()->Void)? = nil) {
         DispatchQueue.main.async {
             // start NudgeGeo spcific
-                let locMgr = LocationManagerDelegate.SharedManager
+            Task {
+                let locMgr = LocationManagerDelegate.LocationManagerAccess.SharedManager
                 if (callback != nil){
                     locMgr.locationCallback = callback
                 }
                 locMgr.startMonitoringLocation()
-            // end NudgeGeo spcific
-            NSLog("You've been nudged!")
+                // end NudgeGeo spcific
+                NSLog("You've been nudged!")
+            }
         
         }
     }
@@ -197,7 +199,9 @@ private let fileName = "NudgeGeo.swift"
 
         print("setNudgeLocationPermissions postData is " + paramsDict.description)
         
-        HttpClientApi.instance().makeAPICall(url: url, params:paramsDict, method: .POST,
+        let postDataParams = Params(paramsData: paramsDict)
+        
+        HttpClientApi.instance().makeAPICall(url: url, params:postDataParams, method: .POST,
                                              success: { (data, response, error) in
             
             print("setNudgeLocationPermissions call successful")
