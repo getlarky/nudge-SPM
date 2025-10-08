@@ -15,7 +15,7 @@ private let fileName = "Nudge.swift"
 @objc open class Nudge : NSObject {
     var myNudge: NudgeBase?
     var logger = CustomLog()
-    var myNudgeVersion: NudgeVersion = NudgeVersion.nudgeLegacy
+    var myNudgeVersion: Nudge.NudgeVersion = Nudge.NudgeVersion.nudgeLegacy
     
     public enum NudgeVersion: String, Sendable {
         case nudgeStandard = "nudgeStandard"
@@ -25,11 +25,11 @@ private let fileName = "Nudge.swift"
     
     public static func fromNumeric(_ version: Int) -> NudgeVersion {
         switch version {
-        case 0: return NudgeVersion.nudgeStandard
-        case 1:      return NudgeVersion.nudgeGeo
-        case 2:   return NudgeVersion.nudgeLegacy
+        case 0: return Nudge.NudgeVersion.nudgeStandard
+        case 1:      return Nudge.NudgeVersion.nudgeGeo
+        case 2:   return Nudge.NudgeVersion.nudgeLegacy
         default:
-            return NudgeVersion.nudgeGeo
+            return Nudge.NudgeVersion.nudgeGeo
         }
     }
     
@@ -56,15 +56,15 @@ private let fileName = "Nudge.swift"
                 nudgeVersion = swiftEnum
             }
             
-            if ((nudgeVersion as? NudgeVersion) == nil){
+            if ((nudgeVersion as? Nudge.NudgeVersion) == nil){
                 return
             }
             
             
-            if (nudgeVersion as! Nudge.NudgeVersion == NudgeVersion.nudgeGeo){
+            if (nudgeVersion as! Nudge.NudgeVersion == Nudge.NudgeVersion.nudgeGeo){
                 logger.debug(message: "nudgeGeo selected")
                 
-                self.myNudgeVersion = NudgeVersion.nudgeGeo
+                self.myNudgeVersion = Nudge.NudgeVersion.nudgeGeo
                 
                 
                 var parameters: [String:Any] = [
@@ -81,10 +81,10 @@ private let fileName = "Nudge.swift"
                 
                 myNudge = NudgeGeo(options: parameters)
             }
-            else if (nudgeVersion as! Nudge.NudgeVersion == NudgeVersion.nudgeStandard){
+            else if (nudgeVersion as! Nudge.NudgeVersion == Nudge.NudgeVersion.nudgeStandard){
                 logger.debug(message: "nudgeStandard selected")
 
-                self.myNudgeVersion = NudgeVersion.nudgeStandard
+                self.myNudgeVersion = Nudge.NudgeVersion.nudgeStandard
                 var parameters: [String:Any] = [
                     "apiKey": options[Constants.Options.apiKey] as! String,
                     "enabled": currentEnabled,
@@ -103,7 +103,7 @@ private let fileName = "Nudge.swift"
             }
         } else {
             logger.debug(message: "nudge Legacy integration selected")
-            self.myNudgeVersion = NudgeVersion.nudgeLegacy
+            self.myNudgeVersion = Nudge.NudgeVersion.nudgeLegacy
             var parameters: [String:Any] = [
                 "apiKey": options[Constants.Options.apiKey] as! String,
                 "enabled": options[Constants.Options.enabled] as? Bool ?? false,
@@ -120,7 +120,7 @@ private let fileName = "Nudge.swift"
         }
     }
     
-    @objc func IsEnabled() -> Bool {
+    @objc public func IsEnabled() -> Bool {
         if (myNudge != nil){
             return myNudge?.isEnabled() ?? false
         }
@@ -133,9 +133,9 @@ private let fileName = "Nudge.swift"
     @objc public func setFederationId(federationId: String){
         let formatedFederationId = federationId.trimmingCharacters(in: .whitespacesAndNewlines)
         if (myNudge != nil){
-            if (myNudgeVersion == NudgeVersion.nudgeStandard){
+            if (myNudgeVersion == Nudge.NudgeVersion.nudgeStandard){
                 myNudge?.setFederationId(federationId: formatedFederationId)
-            } else if (myNudgeVersion == NudgeVersion.nudgeGeo){
+            } else if (myNudgeVersion == Nudge.NudgeVersion.nudgeGeo){
                 myNudge?.setFederationId(federationId: formatedFederationId)
             } else {
                 logger.debug(message: "nudge version is not specified")
@@ -147,7 +147,8 @@ private let fileName = "Nudge.swift"
     }
     
     @objc public func registerForLocationServices(showLocationDialog: Bool) {
-        if (myNudgeVersion == NudgeVersion.nudgeGeo){
+        
+        if (myNudgeVersion == Nudge.NudgeVersion.nudgeGeo && (KeyValueStore.getString(key: KeyValueStore.notificationPermission) == "Accept")){
             if let myNudgeGeo = myNudge as? NudgeGeo {
                 KeyValueStore.putBoolean(key: KeyValueStore.showLocationDialog, value: showLocationDialog)
                 myNudgeGeo.registerForLocationServices()
@@ -214,15 +215,12 @@ private let fileName = "Nudge.swift"
     }
     
     @objc public static func receivedPush(notificationPayload: [AnyHashable:Any], application: UIApplication) {
-//        NudgeAnalytics.setupAnalytics()
         NSLog("receivedPush called");
-//        NudgeAnalytics.pushAnalytics(eventName: NudgeAnalytics.RECEIVED_NOTIFICATION, notificationPayload: notificationPayload)
         NudgeBase.trackMessageEvent(endpointName: Constants.Core.Endpoints.nudgeReceived, notificationPayload: notificationPayload)
     }
     
     @MainActor @available(iOS 10.0, *)
     @objc public static func tappedNotification(notification: UNNotification) {
-//        NudgeAnalytics.pushAnalytics(eventName: NudgeAnalytics.TAPPED_NOTIFICATION, notificationPayload: notification.request.content.userInfo)
         NudgeBase.trackMessageEvent(endpointName: Constants.Core.Endpoints.nudgeTapped, notificationPayload: notification.request.content.userInfo)
         let isDeepLink = notification.request.content.userInfo[KeyValueStore.MessageData.isDeepLink] as? Bool ?? false
         if let url = (notification.request.content.userInfo[KeyValueStore.MessageData.messageUrl] as? String), !isDeepLink {
@@ -248,7 +246,6 @@ private let fileName = "Nudge.swift"
     }
     
     private static func getNotificationSettings(){
-//        NudgeAnalytics.setupAnalytics()
         // This #available check has to be included, but the only place this is called is within registerForPushNotifications, which already has the if#available block
         if #available(iOS 10.0, *) {
             UNUserNotificationCenter.current().getNotificationSettings { (settings) in
@@ -260,6 +257,8 @@ private let fileName = "Nudge.swift"
             }
         }
     }
+    
+
     
     
     

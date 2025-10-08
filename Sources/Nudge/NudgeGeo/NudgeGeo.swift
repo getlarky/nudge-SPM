@@ -5,7 +5,8 @@ import os.log
 
 private let fileName = "NudgeGeo.swift"
 
-@objc public class NudgeGeo : NudgeBase {
+@objc(NudgeGeo)
+public class NudgeGeo : NudgeBase {
 //    var logger = CustomLog()
     
     @objc public init(options: Dictionary<String,Any> = [:], callback: (()->Void)? = nil) {
@@ -40,8 +41,17 @@ private let fileName = "NudgeGeo.swift"
         KeyValueStore.putString(key: KeyValueStore.nudgeVersion, value: nudgeVersion.rawValue)
         KeyValueStore.putBoolean(key: KeyValueStore.showLocationDialog, value: showLocationDialog)
         
+        getDeviceLanguage()
+        
 //        self.checkIfEnabled(showLocationDialog: showLocationDialog, enabled: enabled, callback: callback)
         NudgeGeo.checkIfEnabledUpdated(isEnabled: enabled)
+        print("location Current stored: \(KeyValueStore.getString(key: KeyValueStore.locationPermission))")
+        let currentLocationPermission = NudgeGeo.getLocationPermissionStatus()
+        print("location Current active: \(currentLocationPermission)")
+        if KeyValueStore.getString(key: KeyValueStore.locationPermission) != currentLocationPermission {
+            KeyValueStore.putString(key: KeyValueStore.locationPermission, value: currentLocationPermission)
+        }
+        print("location After: \(KeyValueStore.getString(key: KeyValueStore.locationPermission))")
         
         let userId = KeyValueStore.getString(key: KeyValueStore.userId)
         let deviceId = KeyValueStore.getString(key: KeyValueStore.deviceId)
@@ -50,48 +60,17 @@ private let fileName = "NudgeGeo.swift"
                              federationId: federationId,
                              userId: userId,
                              deviceId: deviceId,
-                             success: {(newUserId, newDeviceId) in
+                             success: {(_, newDeviceId) in
                                 self.initializeNudgeSuccess(newDeviceId: newDeviceId)},
                              failure: {(message) in
             NSLog("initializeNudge error:" + message)
         })
     }
-
-//    func checkIfEnabled(showLocationDialog: Bool, enabled: Bool, callback: (()->Void)? = nil) -> Void {
-//        // start NudgeGeo spcific
-//
-//        KeyValueStore.putBoolean(key: KeyValueStore.showLocationDialog, value: showLocationDialog)
-//        // end NudgeGeo spcific
-//        if (!enabled){
-//            NudgeGeo.toggleEnabled(enabled: enabled, success: { res in }, failure: { (message) in NSLog(message)})
-//            KeyValueStore.putBoolean(key: KeyValueStore.isNudgeEnabled, value: enabled)
-//            // start NudgeGeo spcific
-//                let locMgr = LocationManagerDelegate.SharedManager
-//                if (callback != nil){
-//                    locMgr.locationCallback = callback
-//                }
-//                locMgr.stopMonitorinLocation()
-//            // end NudgeGeo spcific
-//            NSLog("nudge is disabled")
-//            return
-//        }
-//    }
     
     override func initializeNudgeSuccess(newDeviceId: String, callback: (@Sendable ()->Void)? = nil) -> Void {
         NudgeGeo.logger.infoNudgeInit(message:"=======================NUDGEGEO=======================")
-        //print("=======================NUDGEGEO=======================")
-     //   let deviceId = KeyValueStore.getString(key: KeyValueStore.deviceId)
-//        NudgeAnalytics.setupAnalytics()
-//        NudgeAnalytics.track(eventName: NudgeAnalytics.INTIALIZE_NUDGE, data: [:])
-                            
-//        KeyValueStore.putBoolean(key: KeyValueStore.isNudgeEnabled, value: true)
-                            
-    //    let APNtoken = KeyValueStore.getString(key: KeyValueStore.APNtoken)
+
         let APNtoken = KeyValueStore.getString(key: KeyValueStore.APNtoken)
-//        if #available(iOS 12.0, *) {
-//            os_log(.debug, "=======================UserDefaults=======================")
-//            os_log(.debug,  "%@", UserDefaults.standard.dictionaryRepresentation())
-//        }
         if (APNtoken != nil) {
             print("APNtoken is \(String(describing: APNtoken))")
             NudgeGeo.registerToken(deviceId: newDeviceId, token: APNtoken, bundleId: NudgeBase.bundleId, success: {() in
@@ -104,17 +83,7 @@ private let fileName = "NudgeGeo.swift"
                 if ((nudgeVersion == NudgeVersionBridge.nudgeLegacy) || locationPermissionStatus == "Always"){
                     self.registerForLocationServices(callback: callback)
                 }
-//                DispatchQueue.main.async {
-//                    // start NudgeGeo spcific
-//                        let locMgr = LocationManagerDelegate.SharedManager
-//                        if (callback != nil){
-//                            locMgr.locationCallback = callback
-//                        }
-//                        locMgr.startMonitoringLocation()
-//                    // end NudgeGeo spcific
-//                    NSLog("You've been nudged!")
-//                
-//                }
+
             }, failure: {(message) in
                 NSLog("registerToken error:" + message)
             })
@@ -125,9 +94,9 @@ private let fileName = "NudgeGeo.swift"
         // Location Manager authoization status locked behind this switch mechanism and
         // has to be collected in this method
         switch CLLocationManager.authorizationStatus() {
-                        case .authorizedAlways:
+                        case .authorizedAlways, .authorizedWhenInUse:
                             return "Always"
-                        case .restricted, .denied, .authorizedWhenInUse:
+                        case .restricted, .denied:
                             return "Restricted or Denied"
                         case .notDetermined:
                             fallthrough
@@ -140,30 +109,6 @@ private let fileName = "NudgeGeo.swift"
         KeyValueStore.putString(key: KeyValueStore.locationPermission, value: getLocationPermissionStatus())
     }
     
-    // decomposed init functions
-//    override public func setFederationId(federationId: String){
-//        KeyValueStore.putString(key: KeyValueStore.federationId, value: federationId)
-//        
-//        let apiKey = KeyValueStore.getString(key: KeyValueStore.apiKey) ?? ""
-//        let userId = KeyValueStore.getString(key: KeyValueStore.userId)
-//        let deviceId = KeyValueStore.getString(key: KeyValueStore.deviceId)
-//        
-//        if apiKey == "" {
-//            return
-//        }
-//        
-//        self.initializeNudge(apiKey: apiKey,
-//                             federationId: federationId,
-//                             userId: userId,
-//                             deviceId: deviceId,
-//                             success: {(newUserId, newDeviceId) in
-//                                self.initializeNudgeSuccess(newDeviceId: newDeviceId)},
-//                             failure: {(message) in
-//            NSLog("initializeNudge error:" + message)
-//        })
-//        
-//        // call to new federationId endpoint goes here
-//    }
     
     public func registerForLocationServices(callback: (@Sendable ()->Void)? = nil) {
         DispatchQueue.main.async {
@@ -202,12 +147,12 @@ private let fileName = "NudgeGeo.swift"
         let postDataParams = Params(paramsData: paramsDict)
         
         HttpClientApi.instance().makeAPICall(url: url, params:postDataParams, method: .POST,
-                                             success: { (data, response, error) in
+                                             success: { (_, _, _) in
             
-            print("setNudgeLocationPermissions call successful")
+            NudgeBase.logger.debugNudgePermissions(message: "setNudgeLocationPermissions call successful")
             
-        }, failure: { (data, response, error) in
-//            NudgeAnalytics.trackError(error: response.debugDescription, file: fileName, function: "setLocationNotificationPermissions")
+        }, failure: { (_, response, _) in
+            NudgeBase.logger.errorNudgePermissions(message: "Nudge setNudgeLocationPermissions failed: \(response?.statusCode)")
             
         })
     }

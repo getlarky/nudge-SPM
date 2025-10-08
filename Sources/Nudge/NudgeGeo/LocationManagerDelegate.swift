@@ -100,10 +100,20 @@ class LocationManagerDelegate: NSObject, @preconcurrency CLLocationManagerDelega
                 }
             }
             
-            guard CLLocationManager.locationServicesEnabled() else {
-                return
-            }
-            startUpdating()
+//            guard CLLocationManager.locationServicesEnabled() else {
+//                return
+//            }
+        
+        switch CLLocationManager.authorizationStatus() {
+            case .authorizedAlways, .authorizedWhenInUse:
+                startUpdating()
+                break
+            case .restricted, .denied, .notDetermined:
+                break
+            @unknown default:
+                break
+        }
+            
         }
     
         
@@ -141,7 +151,6 @@ class LocationManagerDelegate: NSObject, @preconcurrency CLLocationManagerDelega
             case .restricted, .denied:
                 self.locationManager.stopMonitoringSignificantLocationChanges()
                 self.locationManager.stopUpdatingLocation()
-//                NudgeAnalytics.track(eventName: NudgeAnalytics.LOCATION_PERMISSION, data: ["location_permission" : "Restricted or Denied"])
                 NudgeGeo.setLocationPermissions(result: "Restricted or Denied")
                 NudgeGeo.setKeyValueStoreLocationPermissionDefault();
                 if let callable = locationCallback {
@@ -151,7 +160,6 @@ class LocationManagerDelegate: NSObject, @preconcurrency CLLocationManagerDelega
                 
             case .authorizedAlways, .authorizedWhenInUse:
                 startMonitoringLocation()
-//                NudgeAnalytics.track(eventName: NudgeAnalytics.LOCATION_PERMISSION, data: ["location_permission" : "Always"])
                 NudgeGeo.setLocationPermissions(result: "Always")
                 NudgeGeo.setKeyValueStoreLocationPermissionDefault();
                 if let callable = locationCallback {
@@ -166,75 +174,6 @@ class LocationManagerDelegate: NSObject, @preconcurrency CLLocationManagerDelega
         }
     }
     
-//    public func startMonitoringLocation() async {
-//        logger.debugLocationTracking(message: "startMonitoringLocation() method called")
-////        let delegate = self
-//        let authorizationStatus = CLLocationManager.authorizationStatus()
-//        if (authorizationStatus == .restricted || authorizationStatus == .denied) {
-////            NudgeAnalytics.trackError(error: "Location permissions restricted, not monitoring location", file: fileName, function: "startMonitoringLocation")
-//            logger.errorLocationTracking(message: "! Location permissions restricted, not monitoring location")
-//            if (KeyValueStore.getInt(key: KeyValueStore.howManyTimesPrompted) == 3){
-//                return
-//            }
-//        }
-//        let timesPrompted = KeyValueStore.getInt(key: KeyValueStore.howManyTimesPrompted)
-//        if ((authorizationStatus != .authorizedWhenInUse && authorizationStatus != .authorizedAlways) || (timesPrompted == 0)) {
-//            let time = NSDate().timeIntervalSince1970
-//            let secondsSinceLastPrompted = 2628000.0
-//            
-//            
-//            let lastPromptTime = KeyValueStore.getDouble(key: KeyValueStore.lastPermissionsPromptTime)
-//            if ((lastPromptTime < (time + secondsSinceLastPrompted)) && (timesPrompted < 3)){
-//                KeyValueStore.putDouble(key: KeyValueStore.lastPermissionsPromptTime, value: time)
-//                if (KeyValueStore.getBoolean(key: KeyValueStore.showLocationDialog) == true){
-//                    
-//                    if (authorizationStatus != .denied || (authorizationStatus == .authorizedAlways) && (timesPrompted == 0)){
-//                        
-//                        KeyValueStore.putInt(key: KeyValueStore.howManyTimesPrompted, value: (timesPrompted + 1))
-//                        await MainActor.run {
-//                            let alertController = UIAlertController(
-//                                title: KeyValueStore.getString(key: KeyValueStore.orgLocationDialogTitle),
-//                                message: KeyValueStore.getString(key: KeyValueStore.orgLocationDialogBody),
-//                                preferredStyle: .alert
-//                            )
-//                            
-//                            let actionOK = UIAlertAction(title: "OK", style: .default) { _ in
-//                                Task {
-////                                        await MainActor.run {
-////                                    @MainActor in
-////                                            (UIApplication.shared.delegate as? LocationManagerDelegate)?
-////                                                .locationManager
-////                                                .requestWhenInUseAuthorization()
-////                                        }
-////                                    await LocationManagerAccess.requestAuthorization()
-////                                    await self.requestAuthorization()
-//                                    
-//                                    }
-//                            }
-//                            
-//                            
-//                            alertController.addAction(actionOK)
-////                            logger.debugLocationTracking(message: "Present Prominent Disclosure Dialog")
-//                            alertController.present(animated: true, completion: nil)
-//                            return
-//                            
-//                        }
-//                        
-//                    }
-//                } else {
-//                    logger.debugLocationTracking(message: "Requesting Allow Always Location Permission")
-//                    self.locationManager.requestAlwaysAuthorization()
-//                    return
-//                }
-//            }
-//        }
-//        if (!checkIfLocationServicesEnabled()){
-//            return
-//        }
-//        locationManager.startUpdatingLocation()
-//        locationManager.startMonitoringSignificantLocationChanges()
-//        logger.infoLocationTracking(message:"------- Start Location Monitoring ------------")
-//    }
     
     public func stopMonitorinLocation(){
         self.locationManager.stopMonitoringSignificantLocationChanges()
@@ -243,7 +182,10 @@ class LocationManagerDelegate: NSObject, @preconcurrency CLLocationManagerDelega
     
     func locationManager(_ manager: CLLocationManager,  didUpdateLocations locations: [CLLocation]) {
         logger.debugLocationTracking(message:"------- Location Update ------------")
-        let lastLocation = locations.last!
+        guard let lastLocation = locations.last else {
+            NSLog("Error with Location Update: no last location found")
+            return
+        }
         let uncertainty = lastLocation.horizontalAccuracy
         var paramsDict = [String:Any]()
         if (uncertainty < MAXIMUM_UNCERTAINTY_FOR_USE) {
@@ -262,24 +204,21 @@ class LocationManagerDelegate: NSObject, @preconcurrency CLLocationManagerDelega
             paramsDict["user_id"] = KeyValueStore.getString(key: KeyValueStore.userId)
             paramsDict["device_platform"] = KeyValueStore.devicePlatform
             
-          //  let url = Constants.Core.url + Constants.Core.Endpoints.actionsByLocationAndDatetime
             let url = EnvironmentUtils.getNudgeURL(service: EnvironmentUtils.Service.CORE.rawValue) + Constants.Core.Endpoints.actionsByLocationAndDatetime
-           // print("actionsByLocationAndDatetime url is " + url)
             let text = "actionsByLocationAndDatetime postData is " + paramsDict.description
             logger.debugLocationTracking(message: text)
-            //print("actionsByLocationAndDatetime postData is " + paramsDict.description)
             
             let paramsData = Params(paramsData: paramsDict)
             
             HttpClientApi.instance().makeAPICall(url: url, params:paramsData, method: .POST, success: { (data, response, error) in
-            }, failure: { (data, response, error) in
-//                NudgeAnalytics.trackError(error: response.debugDescription, file: fileName, function: "locationManager.didUpdateLocations")
+            }, failure: { (_, response, _) in
+                NudgeGeo.logger.infoLocationTracking(message: "actionsByLocationAndDatetime failure \(response?.statusCode)")
             })
         }
     }
     
     nonisolated func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
-//        NudgeAnalytics.trackError(error: error.localizedDescription, file: fileName, function: "locationManager.didFailWithError")
+        NudgeGeo.logger.errorLocationTracking(message: "locationMananger did fail with error: \(error.localizedDescription)")
         if let error = error as? CLError, error.code == .denied {
             manager.stopUpdatingLocation()
             manager.stopMonitoringSignificantLocationChanges()
@@ -291,10 +230,12 @@ class LocationManagerDelegate: NSObject, @preconcurrency CLLocationManagerDelega
 }
 
 func checkIfLocationServicesEnabled() -> Bool {
+    
     if !CLLocationManager.locationServicesEnabled() {
-//        NudgeAnalytics.trackError(error: "Location services not enabled/available, not monitoring location", file: fileName, function: "startMonitoringLocation")
+        NudgeGeo.logger.debugLocationTracking(message: "Location Services Disabled")
         return false
     }
+    NudgeGeo.logger.debugLocationTracking(message: "Location Services Enabled")
     return true
 }
 

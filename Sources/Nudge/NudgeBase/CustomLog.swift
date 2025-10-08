@@ -18,6 +18,7 @@ extension OSLog {
     static let nudge = OSLog(subsystem: subsystem, category: "nudge")
     static let nudgePermissions = OSLog(subsystem: subsystem, category: "nudgePermissions")
     static let nudgeMessaging = OSLog(subsystem: subsystem, category: "nudgeMessaging")
+   
 }
 
 public final class CustomLog : NSObject, Sendable {

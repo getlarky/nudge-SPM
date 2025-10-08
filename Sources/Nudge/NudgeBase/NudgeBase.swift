@@ -11,7 +11,8 @@ import MessageUI
 
 private let fileName = "NudgeBase.swift"
 
-@objc open class NudgeBase : NSObject, @unchecked Sendable {
+@objc(NudgeBase)
+open class NudgeBase : NSObject, @unchecked Sendable {
     public static let bundleId = Bundle.main.bundleIdentifier
     
     public static let deviceModel = getDeviceModel()
@@ -47,6 +48,8 @@ private let fileName = "NudgeBase.swift"
         KeyValueStore.putString(key: KeyValueStore.apiKey, value: apiKey)
         KeyValueStore.putBoolean(key: KeyValueStore.isNudgeEnabled, value: enabled)
         KeyValueStore.putString(key: KeyValueStore.nudgeVersion, value: nudgeVersion.rawValue)
+        
+        getDeviceLanguage()
 
 //        self.checkIfEnabled(enabled: enabled)
         NudgeBase.checkIfEnabledUpdated(isEnabled: enabled)
@@ -69,8 +72,6 @@ private let fileName = "NudgeBase.swift"
     func initializeNudgeSuccess(newDeviceId: String, callback: (@Sendable ()->Void)? = nil) -> Void {
         NudgeBase.logger.infoNudgeInit(message: "=======================NUDGESTANDARD=======================")
         _ = KeyValueStore.getString(key: KeyValueStore.deviceId)
-//        NudgeAnalytics.setupAnalytics()
-//        NudgeAnalytics.track(eventName: NudgeAnalytics.INTIALIZE_NUDGE, data: [:])
                
         KeyValueStore.putBoolean(key: KeyValueStore.isNudgeEnabled, value: true)
                             
@@ -97,14 +98,14 @@ private let fileName = "NudgeBase.swift"
                              failure: @escaping (String) -> Void) {
         let userId = KeyValueStore.getString(key: KeyValueStore.userId)
 
-        if (userId == nil) {
+        guard let userId = userId else {
             NSLog("toggleEnabled: no userId")
             return
         }
         
-        NSLog("toggleEnabled:" + userId! + " => " + String(enabled))
+        NSLog("toggleEnabled:" + userId + " => " + String(enabled))
         
-        let url = Constants.Core.url + Constants.Core.Endpoints.toggleNotifications + "/" + userId!
+        let url = Constants.Core.url + Constants.Core.Endpoints.toggleNotifications + "/" + userId
 
         var paramsDict = [String:Any]()
         paramsDict[Constants.Core.PostData.toggle] = enabled ? Constants.Core.PostData.enable : Constants.Core.PostData.disable
@@ -114,17 +115,20 @@ private let fileName = "NudgeBase.swift"
         HttpClientApi.instance().makeAPICall(url: url, params: postDataParams, method: .POST,
                                              success: { (data, response, error) in
             do {
-                let responseJson = try JSONSerialization.jsonObject(with: data!) as? NSDictionary
-                let res = responseJson![Constants.Core.GetData.notifications] as! String
+                guard
+                    let data = data,
+                    let responseJson = try JSONSerialization.jsonObject(with: data) as? NSDictionary,
+                    let res = responseJson[Constants.Core.GetData.notifications] as? String
+                else {
+                    NudgeBase.logger.errorNudgePermissions(message: "Nudge setEnabled parse error")
+                    return
+                }
                 print(res)
-//                success(res == Constants.Core.PostData.enable)
                 NudgeBase.logger.infoNudgePermissions(message: "Nudge setEnabled successful: \(res)")
             } catch {
-//                NudgeAnalytics.trackError(error: response.debugDescription, file: fileName, function: "setIsEnabled")
                 NudgeBase.logger.errorNudgePermissions(message: "Nudge setEnabled failed: \(response?.statusCode)")
             }
         }, failure: { (data, response, error) in
-//            NudgeAnalytics.trackError(error: response.debugDescription, file: fileName, function: "setIsEnabled")
             NudgeBase.logger.errorNudgePermissions(message: "Nudge setEnabled failed: \(response?.statusCode)")
         })
     }
@@ -142,22 +146,36 @@ private let fileName = "NudgeBase.swift"
         }
     }
     
-        public static func getDeviceModel() -> String {
-            var systemInfo = utsname()
-            uname(&systemInfo)
-            let machineMirror = Mirror(reflecting: systemInfo.machine)
-            let identifier = machineMirror.children.reduce("") { identifier, element in
-                guard let value = element.value as? Int8, value != 0 else { return identifier }
-                return identifier + String(UnicodeScalar(UInt8(value)))
+    public static func getDeviceModel() -> String {
+        var systemInfo = utsname()
+        uname(&systemInfo)
+        let machineMirror = Mirror(reflecting: systemInfo.machine)
+        let identifier = machineMirror.children.reduce(into: "") { identifier, element in
+            guard let value = element.value as? Int8, value != 0 else { return }
+            return identifier.append(Character(UnicodeScalar(UInt8(value))))
+        }
+        return identifier
+
+    }
+    
+    private static func getOSInfo()->String {
+        let os = ProcessInfo().operatingSystemVersion
+        return String(os.majorVersion) + "." + String(os.minorVersion) + "." + String(os.patchVersion)
+    }
+    
+    func getDeviceLanguage(){
+        
+        if let languageCode = Locale.preferredLanguages.first {
+            let codeOnly = Locale(identifier: languageCode).languageCode
+            print("LanguageCode: \(codeOnly ?? "Unknown")")
+            
+            if (codeOnly != nil) {
+                KeyValueStore.putString(key: KeyValueStore.preferredLanguage, value: codeOnly)
             }
-            return identifier
-    
         }
-    
-        private static func getOSInfo()->String {
-            let os = ProcessInfo().operatingSystemVersion
-            return String(os.majorVersion) + "." + String(os.minorVersion) + "." + String(os.patchVersion)
-        }
+        
+        
+    }
     
     
     public func initializeNudge(apiKey: String, federationId: String, userId: String?,
@@ -177,10 +195,10 @@ private let fileName = "NudgeBase.swift"
         paramsDict[Constants.Core.PostData.model] = NudgeBase.deviceModel
         paramsDict[Constants.Core.PostData.devicePlatform] = Constants.Core.PostData.iosPlatform
         paramsDict[Constants.Core.PostData.platformVersion] = KeyValueStore.deviceVersion
+        paramsDict[Constants.Core.PostData.preferredLanguage] = KeyValueStore.getString(key: KeyValueStore.preferredLanguage)
         
         print("initializeNudge called!")
         
-    //    let url = Constants.Core.url + Constants.Core.Endpoints.initializeNudge
         let url = EnvironmentUtils.getNudgeURL(service: EnvironmentUtils.Service.CORE.rawValue) + Constants.Core.Endpoints.initializeNudge
         print("initialization url is " + url)
         print("initialization postData is " + paramsDict.description)
@@ -190,33 +208,52 @@ private let fileName = "NudgeBase.swift"
         HttpClientApi.instance().makeAPICall(url: url, params:postDataParams, method: .POST,
                                              success: { (data, response, error) in
             do {
-                let responseJson = try JSONSerialization.jsonObject(with: data!) as? NSDictionary
-                let userId = responseJson![Constants.Core.GetData.userId] as! String
-                let deviceId = responseJson![Constants.Core.GetData.deviceId] as! String
-                let organizationId = responseJson![Constants.Core.GetData.organizationId] as! String
-                let libraryConfig = responseJson![Constants.Core.GetData.libraryConfig] as! NSArray
+                guard
+                    let data = data,
+                    let responseJson = try JSONSerialization.jsonObject(with: data) as? NSDictionary
+                else {
+                    NudgeBase.logger.errorNudgeInit(message: "Nudge initializeNudge parse failed: \(response?.statusCode)")
+                    return
+                }
+                guard
+                    let userId = responseJson[Constants.Core.GetData.userId] as? String,
+                    let deviceId = responseJson[Constants.Core.GetData.deviceId] as? String,
+                    let organizationId = responseJson[Constants.Core.GetData.organizationId] as? String,
+                    let libraryConfig = responseJson[Constants.Core.GetData.libraryConfig] as? [[String: Any]]
+                else {
+                    NudgeBase.logger.errorNudgeInit(message: "Nudge initializeNudge missing fields: \(response?.statusCode)")
+                    return
+                }
+                
+                for elem in libraryConfig {
+                    guard let variable = elem["variable"] as? String else { continue }
 
-                for config in libraryConfig {
-                    let elem = config as! NSDictionary
-                    if elem["variable"] as! String == Constants.Core.LibraryConfigVariables.desiredAccuracy {
-                        KeyValueStore.putString(key: KeyValueStore.orgDesiredAccuracy, value: elem["value"] as? String)
-                    }
-                    if elem["variable"] as! String == Constants.Core.LibraryConfigVariables.distanceFilter {
-                        KeyValueStore.putString(key: KeyValueStore.orgDistanceFilter, value: elem["value"] as? String)
-                    }
-                    if elem["variable"] as! String == Constants.Core.LibraryConfigVariables.analyticsApiKey {
-                        KeyValueStore.putString(key: KeyValueStore.orgAnalyticsApiKey, value: elem["value"] as? String)
-                    }
-//                    if elem["variable"] as! String == Constants.Core.LibraryConfigVariables.tokenDealerSecret {
-//                        KeyValueStore.putString(key: KeyValueStore.orgTokenDealerSecret, value: elem["value"] as? String)
-//                    }
-                    if elem["variable"] as! String == Constants.Core.LibraryConfigVariables.locationDialogTitle {
-                        KeyValueStore.putString(key: KeyValueStore.orgLocationDialogTitle , value: elem["value"] as? String)
-                    }
-                    if elem["variable"] as! String == Constants.Core.LibraryConfigVariables.locationDialogBody {
-                        KeyValueStore.putString(key: KeyValueStore.orgLocationDialogBody, value: elem["value"] as? String)
+                    switch variable {
+                    case Constants.Core.LibraryConfigVariables.desiredAccuracy:
+                        KeyValueStore.putString(key: KeyValueStore.orgDesiredAccuracy,
+                                                value: elem["value"] as? String)
+
+                    case Constants.Core.LibraryConfigVariables.distanceFilter:
+                        KeyValueStore.putString(key: KeyValueStore.orgDistanceFilter,
+                                                value: elem["value"] as? String)
+
+                    case Constants.Core.LibraryConfigVariables.analyticsApiKey:
+                        KeyValueStore.putString(key: KeyValueStore.orgAnalyticsApiKey,
+                                                value: elem["value"] as? String)
+
+                    case Constants.Core.LibraryConfigVariables.locationDialogTitle:
+                        KeyValueStore.putString(key: KeyValueStore.orgLocationDialogTitle,
+                                                value: elem["value"] as? String)
+
+                    case Constants.Core.LibraryConfigVariables.locationDialogBody:
+                        KeyValueStore.putString(key: KeyValueStore.orgLocationDialogBody,
+                                                value: elem["value"] as? String)
+
+                    default:
+                        break
                     }
                 }
+                        
                 
                 KeyValueStore.putString(key: KeyValueStore.userId, value: userId)
                 KeyValueStore.putString(key: KeyValueStore.deviceId, value: deviceId)
@@ -224,9 +261,6 @@ private let fileName = "NudgeBase.swift"
                 
                 let currentEnabled = KeyValueStore.getBoolean(key: KeyValueStore.isNudgeEnabled)
                 
-//                NudgeBase.toggleEnabled(enabled: currentEnabled, success: { res in
-//                    success(userId, deviceId)
-//                }, failure: { (message) in failure(message) })
                 print("=================")
                 NudgeBase.setNudgeEnabled(isNudgeEnabled: currentEnabled,  success: { res in
                     print("calling success")
@@ -239,16 +273,12 @@ private let fileName = "NudgeBase.swift"
 //                success(deviceId, userId)
                 
             } catch {
-//                NudgeAnalytics.trackError(error: response.debugDescription, file: fileName, function: "initializeNudge")
-//                failure("Cannot parse initializeNudge response to JSON")
+
                 NudgeBase.logger.errorNudgePermissions(message: "Cannot parse initializeNudge response to JSON")
             }
-        }, failure: { (data, response, error) in
-//            NudgeAnalytics.trackError(error: response.debugDescription, file: fileName, function: "initializeNudge")
-  //          print("makeApiCall error is " + response.debugDescription)
+        }, failure: { (_, response, _) in
+
             KeyValueStore.removeObject(key: KeyValueStore.coreServerToken)
-            
-//                failure(String(data: data ?? Data(), encoding: String.Encoding.utf8) ?? "Data Error")
             NudgeBase.logger.errorNudgePermissions(message: "Cannot parse initializeNudge response to JSON")
             
         })
@@ -257,7 +287,6 @@ private let fileName = "NudgeBase.swift"
     public static func registerToken(deviceId: String?, token: String?, bundleId: String?,
                                success: @Sendable @escaping () -> Void,
                                failure: @escaping (String) -> Void) {
-//        NudgeAnalytics.track(eventName: NudgeAnalytics.REGISTER_TOKEN, data: [:])
 
         var paramsDict = [String:Any]()
         paramsDict[Constants.Core.PostData.deviceId] = deviceId
@@ -272,12 +301,10 @@ private let fileName = "NudgeBase.swift"
         let postDataParams = Params(paramsData: paramsDict)
         
         HttpClientApi.instance().makeAPICall(url: url, params:postDataParams, method: .POST,
-                                             success: { (data, response, error) in
+                                             success: { (_, response, _) in
             success()
             logger.infoNudgeInit(message: "Nudge registerToken: \(response?.statusCode)")
-        }, failure: { (data, response, error) in
-//            NudgeAnalytics.trackError(error: response.debugDescription, file: fileName, function: "registerToken")
-//            failure(data == nil ? response.debugDescription : String(data: data!, encoding: String.Encoding.utf8)!)
+        }, failure: { (_, response, error) in
             logger.errorNudgeInit(message: "Nudge registerToken Error: \(response?.statusCode)")
             logger.debugNudgeInit(message: "Nudge registerToken Error Description: \(error?.localizedDescription)")
         })
@@ -287,15 +314,6 @@ private let fileName = "NudgeBase.swift"
     
     // decomposed init functions
     public class func checkNotificationPermissions(){
-//        UNUserNotificationCenter.current().getNotificationSettings { settings in
-//            DispatchQueue.main.async {
-//                if settings.authorizationStatus == .authorized {
-//                    KeyValueStore.putString(key: KeyValueStore.notificationPermission, value: "Accept")
-//                } else {
-//                    KeyValueStore.putString(key: KeyValueStore.notificationPermission, value: "Decline")
-//                }
-//            }
-//        }
         
         UNUserNotificationCenter.current().getNotificationSettings { notificationSettings in
                 let isAuthorized = (notificationSettings.authorizationStatus == .authorized)
@@ -336,8 +354,7 @@ private let fileName = "NudgeBase.swift"
             NudgeBase.logger.infoNudgeInit(message: "Nudge setFederationId successful: \(response?.statusCode)")
             
             print("setFederationId call successful")
-        }, failure: { (data, response, error) in
-//            NudgeAnalytics.trackError(error: response.debugDescription, file: fileName, function: "setFederationId")
+        }, failure: { (_, response, error) in
             NudgeBase.logger.errorNudgeInit(message: "Nudge setFederationId Error: \(response?.statusCode)")
             NudgeBase.logger.debugNudgeInit(message: "Nudge setFederationId Description: \(error.debugDescription)")
             
@@ -374,21 +391,23 @@ private let fileName = "NudgeBase.swift"
                                              success: { (data, response, error) in
             
             do {
-                let responseJson = try JSONSerialization.jsonObject(with: data!) as? NSDictionary
-                let res = responseJson![Constants.Core.GetData.notifications] as! String
-                print("setNudgeEnabled call successful: " + res)
-                NudgeBase.logger.infoNudgePermissions(message: "Nudge setEnabled successful: \(response?.statusCode)")
-                success(res == Constants.Core.PostData.enable)
+                if let data = data,
+                let responseJson = try JSONSerialization.jsonObject(with: data) as? NSDictionary,
+                   let res = responseJson[Constants.Core.GetData.notifications] as? String {
+                    print("setNudgeEnabled call successful: " + res)
+                    NudgeBase.logger.infoNudgePermissions(message: "Nudge setEnabled successful: \(response?.statusCode)")
+                    success(res == Constants.Core.PostData.enable)
+                } else {
+                    NudgeBase.logger.errorNudgePermissions(message: "Nudge setEnabled Parse Error: \(response?.statusCode)")
+                }
             } catch {
-//                NudgeAnalytics.trackError(error: response.debugDescription, file: fileName, function: "setNudgeEnabled")
-                NudgeBase.logger.errorNudgePermissions(message: "Nudge setEnabled Error: \(response?.statusCode)")
+                NudgeBase.logger.errorNudgePermissions(message: "Nudge setEnabled Catch Error: \(response?.statusCode)")
                 
             }
             
             
-        }, failure: { (data, response, error) in
-//            NudgeAnalytics.trackError(error: response.debugDescription, file: fileName, function: "setNudgeEnabled")
-            
+        }, failure: { (_, response, _) in
+            NudgeBase.logger.errorNudgePermissions(message: "Nudge setEnabled Failure Error: \(response?.statusCode)")
         })
     }
     
@@ -417,7 +436,6 @@ private let fileName = "NudgeBase.swift"
             NudgeBase.logger.infoNudgePermissions(message: "Nudge setNotificationPermissions successful: \(response?.statusCode)")
             
         }, failure: { (data, response, error) in
-//            NudgeAnalytics.trackError(error: response.debugDescription, file: fileName, function: "setNotificationPermissions")
             NudgeBase.logger.errorNudgePermissions(message: "Nudge setNotificationPermissions Error: \(response?.statusCode)")
             
         })
@@ -458,7 +476,7 @@ private let fileName = "NudgeBase.swift"
             print("trackMessageData call successful")
             
         }, failure: { (data, response, error) in
-//            NudgeAnalytics.trackError(error: response.debugDescription, file: fileName, function: "trackMessageData")
+            NudgeBase.logger.errorNudgeMessaging(message: "trackMessageData failure \(response?.statusCode)")
             
         })
     }

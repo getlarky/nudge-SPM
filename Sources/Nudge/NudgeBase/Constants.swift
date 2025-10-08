@@ -9,13 +9,7 @@ import UIKit
 
 
 public struct Constants {
-//    static let id = "id"
-//    public static let nudgeLibraryVersion = "4.0.0"
-//    public static let devicePlatform = "ios"
-//    static let deviceManufacturer = "Apple"
-//    static let deviceModel = NudgeAnalytics.getDeviceModel()
-//    static let deviceVersion = UIDevice.current.systemVersion
-//    static let timezoneValue = TimeZone.current.identifier
+
 
     public struct Core {
         //public static let url = Config.coreServerUrl
@@ -56,6 +50,7 @@ public struct Constants {
             static let messageId = "message_id"
             static let breadcrumbs = "breadcrumbs"
             static let timestamp = "timestamp"
+            public static let preferredLanguage = "preferred_language"
         }
         struct GetData {
             static let userId = "user_id"
@@ -93,17 +88,6 @@ public struct Constants {
         static let federationId = "federationId"
         static let nudgeVersion = "nudgeVersion"
     }
-    
-//    public typealias SendableParams = [String: SendableValue]?
-//    
-//    public enum SendableValue: Sendable {
-//        case string(String)
-//        case int(Int)
-//        case double(Double)
-//        case bool(Bool)
-//        case dictionary([SendableValue])
-//        case array([SendableValue])
-//    }
     
     public static let dateFormat = "yyyy-MM-dd HH:mm:ss"
 }
