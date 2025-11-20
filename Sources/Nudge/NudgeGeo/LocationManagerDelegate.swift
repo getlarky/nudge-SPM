@@ -132,7 +132,7 @@ class LocationManagerDelegate: NSObject, @preconcurrency CLLocationManagerDelega
                 message: KeyValueStore.getString(key: KeyValueStore.orgLocationDialogBody),
                 preferredStyle: .alert
             )
-            alert.addAction(UIAlertAction(title: "OK", style: .default) { _ in
+            alert.addAction(UIAlertAction(title: "Next", style: .default) { _ in
                 onOK()
             })
             
