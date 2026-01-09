@@ -76,6 +76,7 @@ open class NudgeBase : NSObject, @unchecked Sendable {
         KeyValueStore.putBoolean(key: KeyValueStore.isNudgeEnabled, value: true)
                             
         let APNtoken = KeyValueStore.getString(key: KeyValueStore.APNtoken)
+        print("APNToken: " + (APNtoken ?? "NULL") )
         if (APNtoken != nil) {
             print("APNtoken is \(String(describing: APNtoken))")
             NudgeBase.registerToken(deviceId: newDeviceId, token: APNtoken, bundleId: NudgeBase.bundleId, success: {() in
@@ -276,10 +277,10 @@ open class NudgeBase : NSObject, @unchecked Sendable {
 
                 NudgeBase.logger.errorNudgePermissions(message: "Cannot parse initializeNudge response to JSON")
             }
-        }, failure: { (_, response, _) in
-
+        }, failure: { (data, response, _) in
+//            print(String(describing: data) + "  " + String(describing: response))
             KeyValueStore.removeObject(key: KeyValueStore.coreServerToken)
-            NudgeBase.logger.errorNudgePermissions(message: "Cannot parse initializeNudge response to JSON")
+            NudgeBase.logger.errorNudgePermissions(message: "Failure: Cannot parse initializeNudge response to JSON")
             
         })
     }

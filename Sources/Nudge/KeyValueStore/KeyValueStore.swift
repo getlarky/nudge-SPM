@@ -3,7 +3,7 @@ import UIKit
 
 public struct KeyValueStore {
     static let id = "id"
-    public static let nudgeLibraryVersion = "4.1.4"
+    public static let nudgeLibraryVersion = "4.2.0"
     public static let devicePlatform = "ios"
     public static let deviceManufacturer = "Apple"
     public static let apiKey = "apiKey"

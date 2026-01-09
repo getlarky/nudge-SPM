@@ -207,6 +207,19 @@ private let fileName = "Nudge.swift"
         let token = tokenParts.joined()
         KeyValueStore.putString(key: KeyValueStore.APNtoken, value: token)
         print("---------- onRegisteredForNotifications(deviceToken: " + token + " --------------")
+        
+        let deviceId = KeyValueStore.getString(key: KeyValueStore.deviceId)
+        
+        if (token != nil && deviceId != nil){
+            NudgeBase.registerToken(deviceId: deviceId, token: token, bundleId: NudgeBase.bundleId, success: {() in
+                KeyValueStore.putString(key: KeyValueStore.APNtoken, value: token)
+            DispatchQueue.main.async {
+                NSLog("You've been nudged!")
+            }
+            }, failure: {(message) in
+                NSLog("registerToken error:" + message)
+            })
+        }
     }
     
     @objc public static func onFailedToRegisterForNotifications(error: Error){
@@ -259,6 +272,71 @@ private let fileName = "Nudge.swift"
     }
     
 
+    @objc public static func handleRichPushNotification(request: UNNotificationRequest,
+    contentHandler: @escaping (UNNotificationContent) -> Void
+    ) {
+        guard let bestAttemptContent = (request.content.mutableCopy() as? UNMutableNotificationContent) else {
+            contentHandler(request.content)
+            return
+        }
+        
+        let fallback = DispatchWorkItem {
+            NSLog("Extension has timed out")
+            contentHandler(bestAttemptContent)
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 25, execute: fallback)
+        
+        //THIS SECTION WILL BE MODIFIED ONCE PROPERLY IN CORE
+        guard let imageURLString = bestAttemptContent.userInfo["image_url"] as? String,
+              let url = URL(string: imageURLString) else {
+            fallback.cancel()
+            contentHandler(bestAttemptContent)
+            return
+        }
+
+        let lower = imageURLString.lowercased()
+        guard lower.hasSuffix(".png") || lower.hasSuffix(".jpg") || lower.hasSuffix(".jpeg") else {
+            NSLog("Failed to load image: Not a valid file type")
+            fallback.cancel()
+            contentHandler(bestAttemptContent)
+            return
+        }
+        
+        NSLog("Downloading image for notification")
+        let config = URLSessionConfiguration.ephemeral
+        config.timeoutIntervalForRequest = 20
+        config.timeoutIntervalForResource = 20
+        let session = URLSession(configuration: config)
+
+        session.downloadTask(with: url) { location, response, error in
+            if let error = error {
+                os_log("Download error: %@", type: .error, error.localizedDescription)
+                fallback.cancel()
+                contentHandler(bestAttemptContent)
+                return
+            }
+
+            guard let location = location else {
+                fallback.cancel()
+                contentHandler(bestAttemptContent)
+                return
+            }
+
+            let tempURL = URL(fileURLWithPath: NSTemporaryDirectory())
+                .appendingPathComponent(url.lastPathComponent)
+
+            try? FileManager.default.moveItem(at: location, to: tempURL)
+
+            if let attachment = try? UNNotificationAttachment(identifier: "image", url: tempURL, options: nil) {
+                bestAttemptContent.attachments = [attachment]
+            }
+
+            fallback.cancel()
+            contentHandler(bestAttemptContent)
+
+        }.resume()
+        
+    }
     
     
     
