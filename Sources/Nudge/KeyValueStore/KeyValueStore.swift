@@ -3,7 +3,7 @@ import UIKit
 
 public struct KeyValueStore {
     static let id = "id"
-    public static let nudgeLibraryVersion = "4.2.0"
+    public static let nudgeLibraryVersion = "4.2.1"
     public static let devicePlatform = "ios"
     public static let deviceManufacturer = "Apple"
     public static let apiKey = "apiKey"
@@ -35,6 +35,7 @@ public struct KeyValueStore {
     public static let orgLocationDialogBody = "orgLocationDialogBody"
     public static let lastPermissionsPromptTime = "lastPermissionsPromptTime"
     public static let howManyTimesPrompted = "howManyTimesPrompted"
+    public static let needsAlwaysUpgrade = "needsAlwaysUpgrade"
     public static let notificationPermission = "notification_permission"
     public static let locationPermission = "location_permission"
     public static let preferredLanguage = "preferred_language"

@@ -34,30 +34,30 @@ open class HttpClientApi: NSObject, @unchecked Sendable{
         return HttpClientApi()
     }
     
-    func getToken(serverInfo: ServerTokenInfo, success: @escaping @Sendable (Data?, HTTPURLResponse?, Error?) -> Void, failure: @escaping @Sendable (Data?, HTTPURLResponse?, Error? ) -> Void) {
-        
-        var postData = tokenPayload
-        if let tokenDealerSecret = KeyValueStore.getString(key: KeyValueStore.orgTokenDealerSecret) {
-            postData["client_secret"] = tokenDealerSecret
-            print("tokenDealerSecret: " + tokenDealerSecret)
-        }
-        postData["audience"] = serverInfo.audience
-        print("tokenDealr params: \(String(describing: postData))")
-      //  print("Firebase registration token: \(String(describing: fcmToken))")
-        let postDataParams = Params(paramsData: postData)
-        makeAPICall(url: Constants.Tokendealer.url + Constants.Tokendealer.Endpoints.createToken, params: postDataParams, method: HttpMethod.POST, success: { (data, response, error) in
-            guard let data = data,
-                  let responseJson = try? JSONSerialization.jsonObject(with: data) as? NSDictionary else {
-                    NSLog("getToken failed to parse JSON")
-                    return
-                }
-            KeyValueStore.putString(key: serverInfo.tokenDefault, value: responseJson[Constants.Tokendealer.PostData.accessToken] as? String)
-            success(data, response, error)
-        }, failure: { (data, response, error) in
-            NSLog("getToken API call failed \(response?.statusCode)")
-            failure(data, response, error)
-        }, canBeReauthorized: false)
-    }
+    // getToken may be obsolete — commented out pending confirmation
+//    func getToken(serverInfo: ServerTokenInfo, success: @escaping @Sendable (Data?, HTTPURLResponse?, Error?) -> Void, failure: @escaping @Sendable (Data?, HTTPURLResponse?, Error? ) -> Void) {
+//
+//        var postData = tokenPayload
+//        if let tokenDealerSecret = KeyValueStore.getString(key: KeyValueStore.orgTokenDealerSecret) {
+//            postData["client_secret"] = tokenDealerSecret
+//            print("tokenDealerSecret: " + tokenDealerSecret)
+//        }
+//        postData["audience"] = serverInfo.audience
+//        print("tokenDealr params: \(String(describing: postData))")
+//        let postDataParams = Params(paramsData: postData)
+//        makeAPICall(url: Constants.Tokendealer.url + Constants.Tokendealer.Endpoints.createToken, params: postDataParams, method: HttpMethod.POST, success: { (data, response, error) in
+//            guard let data = data,
+//                  let responseJson = try? JSONSerialization.jsonObject(with: data) as? NSDictionary else {
+//                    NSLog("getToken failed to parse JSON")
+//                    return
+//                }
+//            KeyValueStore.putString(key: serverInfo.tokenDefault, value: responseJson[Constants.Tokendealer.PostData.accessToken] as? String)
+//            success(data, response, error)
+//        }, failure: { (data, response, error) in
+//            NSLog("getToken API call failed \(response?.statusCode)")
+//            failure(data, response, error)
+//        }, canBeReauthorized: false)
+//    }
     
     func makeAPICall(url: String, params: Params?,
                      method: HttpMethod,
@@ -74,14 +74,15 @@ open class HttpClientApi: NSObject, @unchecked Sendable{
         print("makeAPICall for url: " + url)
         
         request = URLRequest(url: requestURL)
-        let serverInfo = getAudienceFromUrl(url: url)
+        // let serverInfo = getAudienceFromUrl(url: url)
         
         let paramsPayload = params?.paramsData
         
         
-        if let token = serverInfo.token {
-            request?.setValue(KeyValueStore.bearer + " " + token, forHTTPHeaderField: KeyValueStore.authorizationHeader)
-        }
+        // Tokendealer auth may be obsolete — commented out pending confirmation
+//        if let token = serverInfo.token {
+//            request?.setValue(KeyValueStore.bearer + " " + token, forHTTPHeaderField: KeyValueStore.authorizationHeader)
+//        }
         request?.setValue(KeyValueStore.nudgeLibraryVersion,forHTTPHeaderField: KeyValueStore.nudgeLibraryVersionHeader)
         if let params = paramsPayload {
             let  jsonData = try? JSONSerialization.data(withJSONObject: params, options: .prettyPrinted)
@@ -110,21 +111,19 @@ open class HttpClientApi: NSObject, @unchecked Sendable{
                 if let response = response as? HTTPURLResponse, 200...299 ~= response.statusCode {
                     success(data, response, error as NSError?)
                 } 
-                else if let response = response as? HTTPURLResponse, (response.statusCode == 401 || response.statusCode == 403) {
-                    if canBeReauthorized {
-                        self.getToken(serverInfo:serverInfo, success: { (data, response, error) in
-                            if !isRetry {
-
-                                    self.makeAPICall(url: url, params: params, method: method, success: success, failure: failure, canBeReauthorized: true, isRetry: true)
-                                    
-
-                            }
-                        }, failure: { (_, response, _) in
-                            NSLog("makeAPICall failed \(response?.statusCode)")
-                            KeyValueStore.putBoolean(key: KeyValueStore.isAuthenticated, value: false)
-                        })
-                    }
-                } 
+                // Tokendealer reauth may be obsolete — commented out pending confirmation
+//                else if let response = response as? HTTPURLResponse, (response.statusCode == 401 || response.statusCode == 403) {
+//                    if canBeReauthorized {
+//                        self.getToken(serverInfo:serverInfo, success: { (data, response, error) in
+//                            if !isRetry {
+//                                self.makeAPICall(url: url, params: params, method: method, success: success, failure: failure, canBeReauthorized: true, isRetry: true)
+//                            }
+//                        }, failure: { (_, response, _) in
+//                            NSLog("makeAPICall failed \(response?.statusCode)")
+//                            KeyValueStore.putBoolean(key: KeyValueStore.isAuthenticated, value: false)
+//                        })
+//                    }
+//                } 
                 else {
                     failure(data , response as? HTTPURLResponse, error as NSError?)
                 }
@@ -134,21 +133,22 @@ open class HttpClientApi: NSObject, @unchecked Sendable{
             }.resume()
     }
     
-    private func getAudienceFromUrl(url: String) -> ServerTokenInfo {
-        if url.contains(Constants.Core.url) {
-            return (
-                audience: Constants.Tokendealer.PostData.coreAudience,
-                tokenDefault: KeyValueStore.coreServerToken,
-                token:   KeyValueStore.getString(key: KeyValueStore.coreServerToken)
-            )
-        } else {
-            return (
-                audience: "",
-                tokenDefault: "",
-                token: nil
-            )
-        }
-    }
+    // getAudienceFromUrl may be obsolete — commented out pending confirmation
+//    private func getAudienceFromUrl(url: String) -> ServerTokenInfo {
+//        if url.contains(Constants.Core.url) {
+//            return (
+//                audience: Constants.Tokendealer.PostData.coreAudience,
+//                tokenDefault: KeyValueStore.coreServerToken,
+//                token:   KeyValueStore.getString(key: KeyValueStore.coreServerToken)
+//            )
+//        } else {
+//            return (
+//                audience: "",
+//                tokenDefault: "",
+//                token: nil
+//            )
+//        }
+//    }
 }
 
 

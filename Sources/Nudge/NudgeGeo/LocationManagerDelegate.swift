@@ -41,80 +41,67 @@ class LocationManagerDelegate: NSObject, @preconcurrency CLLocationManagerDelega
 
         self.locationManager.distanceFilter = KeyValueStore.getDouble(key: KeyValueStore.orgDistanceFilter)
 //        logger.infoLocationTracking(message: "TEST: \(self.locationManager.distanceFilter) \(self.locationManager.desiredAccuracy)")
-        if #available(iOS 9.0, *) {
-            self.locationManager.allowsBackgroundLocationUpdates = true
-        } else {
-//            NudgeAnalytics.trackError(error: "iOS version less than 9.0, not supporting location monitoring.", file: fileName, function: "init")
-        }
+        self.locationManager.allowsBackgroundLocationUpdates = CLLocationManager.authorizationStatus() == .authorizedAlways
+        self.locationManager.showsBackgroundLocationIndicator = false
         self.locationManager.pausesLocationUpdatesAutomatically = false
         logger.infoLocationTracking(message: "------- Location Manager Delegate initialized ------------")
     }
     
     @MainActor
     public func startMonitoringLocation() {
-            logger.debugLocationTracking(message: "startMonitoringLocation() method called")
-            
-            let status = CLLocationManager.authorizationStatus()
-            
-            // Handle denied/restricted
-            if status == .restricted || status == .denied {
-                logger.errorLocationTracking(message: "! Location permissions restricted, not monitoring location")
-                if KeyValueStore.getInt(key: KeyValueStore.howManyTimesPrompted) >= 3 {
-                    return
-                }
-            }
-            
-            let timesPrompted = KeyValueStore.getInt(key: KeyValueStore.howManyTimesPrompted)
-            
-            // First prompt logic (or not yet fully authorized)
-            if (status != .authorizedWhenInUse && status != .authorizedAlways) || timesPrompted == 0 {
-                let now = Date().timeIntervalSince1970
-                let interval = 2628000.0  // ~1 month
-                let lastPrompt = KeyValueStore.getDouble(key: KeyValueStore.lastPermissionsPromptTime)
-                
-                if (lastPrompt < (now - interval)) && timesPrompted < 3 {
-                    KeyValueStore.putDouble(key: KeyValueStore.lastPermissionsPromptTime, value: now)
-                    
-                    if KeyValueStore.getBoolean(key: KeyValueStore.showLocationDialog) {
-                        
-                        // show your disclosure UI
-                        showDisclosureDialog {
-                            KeyValueStore.putInt(key: KeyValueStore.howManyTimesPrompted, value: timesPrompted + 1)
-                            
-                            switch status {
-                            case .notDetermined:
-                                self.locationManager.requestWhenInUseAuthorization()
-                            case .authorizedWhenInUse:
-                                self.locationManager.requestAlwaysAuthorization()
-                            default:
-                                break
-                            }
-                        }
-                        return
-                    } else {
-                        // direct request without disclosure
-                        logger.debugLocationTracking(message: "Requesting Allow Always Location Permission")
-                        locationManager.requestAlwaysAuthorization()
-                        return
-                    }
-                }
-            }
-            
-//            guard CLLocationManager.locationServicesEnabled() else {
-//                return
-//            }
-        
-        switch CLLocationManager.authorizationStatus() {
-            case .authorizedAlways, .authorizedWhenInUse:
-                startUpdating()
-                break
-            case .restricted, .denied, .notDetermined:
-                break
-            @unknown default:
-                break
+        logger.debugLocationTracking(message: "startMonitoringLocation() method called")
+
+        let status = CLLocationManager.authorizationStatus()
+        let timesPrompted = KeyValueStore.getInt(key: KeyValueStore.howManyTimesPrompted)
+
+        // Already fully authorized
+        if status == .authorizedAlways {
+            startUpdating()
+            return
         }
-            
+
+        // WhenInUse granted, if flagged from a previous session, request Always upgrade now
+        // Otherwise flag it so we request on the next launch (avoids back-to-back prompts)
+        if status == .authorizedWhenInUse {
+            if KeyValueStore.getBoolean(key: KeyValueStore.needsAlwaysUpgrade) {
+                KeyValueStore.putBoolean(key: KeyValueStore.needsAlwaysUpgrade, value: false)
+                locationManager.requestAlwaysAuthorization()
+            } else {
+                KeyValueStore.putBoolean(key: KeyValueStore.needsAlwaysUpgrade, value: true)
+            }
+            startUpdating()
+            return
         }
+
+        // Restricted — nothing we can do
+        if status == .restricted {
+            logger.errorLocationTracking(message: "Location permissions restricted")
+            return
+        }
+
+        // notDetermined or denied — show disclosure if conditions met:
+        // - First time ever (timesPrompted == 0), OR
+        // - Shown once before but not accepted, and 1+ month has passed
+        let now = Date().timeIntervalSince1970
+        let oneMonth = 2628000.0
+        let lastPrompt = KeyValueStore.getDouble(key: KeyValueStore.lastPermissionsPromptTime)
+        let timeElapsed = lastPrompt < (now - oneMonth)
+
+        let canShowDisclosure = timesPrompted == 0 || (timesPrompted == 1 && timeElapsed)
+        guard canShowDisclosure else { return }
+
+        KeyValueStore.putDouble(key: KeyValueStore.lastPermissionsPromptTime, value: now)
+        KeyValueStore.putInt(key: KeyValueStore.howManyTimesPrompted, value: timesPrompted + 1)
+
+        if KeyValueStore.getBoolean(key: KeyValueStore.showLocationDialog) {
+            showDisclosureDialog {
+                self.locationManager.requestWhenInUseAuthorization()
+            }
+        } else {
+            logger.debugLocationTracking(message: "Requesting Always Location Permission")
+            locationManager.requestAlwaysAuthorization()
+        }
+    }
     
         
         // MARK: - Helpers
@@ -158,10 +145,21 @@ class LocationManagerDelegate: NSObject, @preconcurrency CLLocationManagerDelega
                 }
                 break
                 
-            case .authorizedAlways, .authorizedWhenInUse:
+            case .authorizedAlways:
+                locationManager.allowsBackgroundLocationUpdates = true
                 startMonitoringLocation()
                 NudgeGeo.setLocationPermissions(result: "Always")
-                NudgeGeo.setKeyValueStoreLocationPermissionDefault();
+                NudgeGeo.setKeyValueStoreLocationPermissionDefault()
+                if let callable = locationCallback {
+                    callable()
+                }
+                break
+
+            case .authorizedWhenInUse:
+                locationManager.allowsBackgroundLocationUpdates = false
+                startMonitoringLocation()
+                NudgeGeo.setLocationPermissions(result: "Restricted or Denied")
+                NudgeGeo.setKeyValueStoreLocationPermissionDefault()
                 if let callable = locationCallback {
                     callable()
                 }

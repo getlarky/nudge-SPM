@@ -247,15 +247,15 @@ private let fileName = "Nudge.swift"
     
     @MainActor
     private static func redirectToUrl(messageUrl: String) {
-        guard let url = URL(string: messageUrl) else {
-            return
+        guard let url = URL(string: messageUrl) else { return }
+
+        // Try universal link first — opens in the host app if registered for this URL
+        UIApplication.shared.open(url, options: [.universalLinksOnly: true]) { success in
+            if !success {
+                // Not a universal link, open normally (Safari)
+                UIApplication.shared.open(url, options: [:], completionHandler: nil)
+            }
         }
-        if #available(iOS 10.0, *) {
-            UIApplication.shared.open(url, options: [:], completionHandler: nil)
-        } else {
-            UIApplication.shared.openURL(url)
-        }
-        
     }
     
     private static func getNotificationSettings(){
@@ -286,7 +286,7 @@ private let fileName = "Nudge.swift"
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + 25, execute: fallback)
         
-        //THIS SECTION WILL BE MODIFIED ONCE PROPERLY IN CORE
+        
         guard let imageURLString = bestAttemptContent.userInfo["image_url"] as? String,
               let url = URL(string: imageURLString) else {
             fallback.cancel()

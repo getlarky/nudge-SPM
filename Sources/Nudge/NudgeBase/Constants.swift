@@ -69,17 +69,18 @@ public struct Constants {
         }
     }
     
-    struct Tokendealer {
-        //static let url = Config.tokendealerServerUrl
-        static let url = EnvironmentUtils.getNudgeURL(service: EnvironmentUtils.Service.TOKENDEALER.rawValue)
-        struct Endpoints {
-            static let createToken = "token"
-        }
-        struct PostData {
-            static let coreAudience = "CORE"
-            static let accessToken = "access_token"
-        }
-    }
+    // Tokendealer may be obsolete — commented out pending confirmation
+//    struct Tokendealer {
+//        //static let url = Config.tokendealerServerUrl
+//        static let url = EnvironmentUtils.getNudgeURL(service: EnvironmentUtils.Service.TOKENDEALER.rawValue)
+//        struct Endpoints {
+//            static let createToken = "token"
+//        }
+//        struct PostData {
+//            static let coreAudience = "CORE"
+//            static let accessToken = "access_token"
+//        }
+//    }
     
     struct Options {
         static let apiKey = "apiKey"

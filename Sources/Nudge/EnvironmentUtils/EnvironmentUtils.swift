@@ -40,7 +40,6 @@ public class EnvironmentUtils {
             case Environment.STAGING:   return "https://" + service + ".stg.nudge.rocks/"
             case Environment.DR:        return "https://" + service + ".proddr.dr.larky.cloud/"
             case Environment.PROD:      return "https://" + service + ".nudge.larky.cloud/"
-            
         }
     }
     
