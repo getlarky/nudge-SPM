@@ -30,16 +30,13 @@ public class EnvironmentUtils {
         return _env.rawValue
     }
     
-    // return the proper URL given a desired environment and service (i.e. core or tokendealer endpoint)
+    // return the proper URL for the current environment (all mobile requests use the mobile subdomain)
     public static func getNudgeURL(service: String) -> String {
-        if(Service(rawValue: service) == nil) {
-            return "Service name not valid.";
-        }
         switch (_env) {
-            case Environment.DEV:       return "https://" + service + ".dev.nudge.rocks/"
-            case Environment.STAGING:   return "https://" + service + ".stg.nudge.rocks/"
-            case Environment.DR:        return "https://" + service + ".proddr.dr.larky.cloud/"
-            case Environment.PROD:      return "https://" + service + ".nudge.larky.cloud/"
+            case Environment.DEV:       return "https://mobile.dev.nudge.rocks/"
+            case Environment.STAGING:   return "https://mobile.stg.nudge.rocks/"
+            case Environment.DR:        return "https://mobile.proddr.dr.larky.cloud/"
+            case Environment.PROD:      return "https://mobile.nudge.larky.cloud/"
         }
     }
     

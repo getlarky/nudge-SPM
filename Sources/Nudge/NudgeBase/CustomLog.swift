@@ -10,7 +10,7 @@ import os.log
 
 extension OSLog {
     private static let subsystem: String = {
-        Bundle(for: Nudge.self).bundleIdentifier ?? "com.yourcompany.yourlibrary"
+        Bundle(for: NudgeSDK.self).bundleIdentifier ?? "com.yourcompany.yourlibrary"
     }()
 
     static let locationTracking = OSLog(subsystem: subsystem, category: "locationTracking")

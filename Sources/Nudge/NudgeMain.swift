@@ -12,10 +12,10 @@ import UIKit
 
 private let fileName = "Nudge.swift"
 
-@objc open class Nudge : NSObject {
+@objc(Nudge) open class NudgeSDK : NSObject {
     var myNudge: NudgeBase?
     var logger = CustomLog()
-    var myNudgeVersion: Nudge.NudgeVersion = Nudge.NudgeVersion.nudgeLegacy
+    var myNudgeVersion: NudgeSDK.NudgeVersion = NudgeSDK.NudgeVersion.nudgeLegacy
     
     public enum NudgeVersion: String, Sendable {
         case nudgeStandard = "nudgeStandard"
@@ -25,11 +25,11 @@ private let fileName = "Nudge.swift"
     
     public static func fromNumeric(_ version: Int) -> NudgeVersion {
         switch version {
-        case 0: return Nudge.NudgeVersion.nudgeStandard
-        case 1:      return Nudge.NudgeVersion.nudgeGeo
-        case 2:   return Nudge.NudgeVersion.nudgeLegacy
+        case 0: return NudgeSDK.NudgeVersion.nudgeStandard
+        case 1:      return NudgeSDK.NudgeVersion.nudgeGeo
+        case 2:   return NudgeSDK.NudgeVersion.nudgeLegacy
         default:
-            return Nudge.NudgeVersion.nudgeGeo
+            return NudgeSDK.NudgeVersion.nudgeGeo
         }
     }
     
@@ -56,15 +56,15 @@ private let fileName = "Nudge.swift"
                 nudgeVersion = swiftEnum
             }
             
-            if ((nudgeVersion as? Nudge.NudgeVersion) == nil){
+            if ((nudgeVersion as? NudgeSDK.NudgeVersion) == nil){
                 return
             }
             
             
-            if (nudgeVersion as! Nudge.NudgeVersion == Nudge.NudgeVersion.nudgeGeo){
+            if (nudgeVersion as! NudgeSDK.NudgeVersion == NudgeSDK.NudgeVersion.nudgeGeo){
                 logger.debug(message: "nudgeGeo selected")
                 
-                self.myNudgeVersion = Nudge.NudgeVersion.nudgeGeo
+                self.myNudgeVersion = NudgeSDK.NudgeVersion.nudgeGeo
                 
                 
                 var parameters: [String:Any] = [
@@ -78,13 +78,20 @@ private let fileName = "Nudge.swift"
                 if options[Constants.Options.federationId] != nil {
                     parameters[Constants.Options.federationId] = options[Constants.Options.federationId]
                 }
-                
+
+                #if GEO_ENABLED
                 myNudge = NudgeGeo(options: parameters)
+                #else
+                logger.debug(message: "nudgeGeo was requested but this build does not include location code; falling back to nudgeStandard")
+                self.myNudgeVersion = NudgeSDK.NudgeVersion.nudgeStandard
+                parameters[Constants.Options.nudgeVersion] = self.myNudgeVersion
+                myNudge = NudgeBase(options: parameters)
+                #endif
             }
-            else if (nudgeVersion as! Nudge.NudgeVersion == Nudge.NudgeVersion.nudgeStandard){
+            else if (nudgeVersion as! NudgeSDK.NudgeVersion == NudgeSDK.NudgeVersion.nudgeStandard){
                 logger.debug(message: "nudgeStandard selected")
 
-                self.myNudgeVersion = Nudge.NudgeVersion.nudgeStandard
+                self.myNudgeVersion = NudgeSDK.NudgeVersion.nudgeStandard
                 var parameters: [String:Any] = [
                     "apiKey": options[Constants.Options.apiKey] as! String,
                     "enabled": currentEnabled,
@@ -103,7 +110,7 @@ private let fileName = "Nudge.swift"
             }
         } else {
             logger.debug(message: "nudge Legacy integration selected")
-            self.myNudgeVersion = Nudge.NudgeVersion.nudgeLegacy
+            self.myNudgeVersion = NudgeSDK.NudgeVersion.nudgeLegacy
             var parameters: [String:Any] = [
                 "apiKey": options[Constants.Options.apiKey] as! String,
                 "enabled": options[Constants.Options.enabled] as? Bool ?? false,
@@ -115,8 +122,15 @@ private let fileName = "Nudge.swift"
             if options[Constants.Options.federationId] != nil {
                 parameters[Constants.Options.federationId] = options[Constants.Options.federationId]
             }
-            
+
+            #if GEO_ENABLED
             myNudge = NudgeGeo(options: parameters)
+            #else
+            logger.debug(message: "Legacy integration defaults to nudgeGeo but this build does not include location code; falling back to nudgeStandard")
+            self.myNudgeVersion = NudgeSDK.NudgeVersion.nudgeStandard
+            parameters[Constants.Options.nudgeVersion] = self.myNudgeVersion
+            myNudge = NudgeBase(options: parameters)
+            #endif
         }
     }
     
@@ -133,9 +147,9 @@ private let fileName = "Nudge.swift"
     @objc public func setFederationId(federationId: String){
         let formatedFederationId = federationId.trimmingCharacters(in: .whitespacesAndNewlines)
         if (myNudge != nil){
-            if (myNudgeVersion == Nudge.NudgeVersion.nudgeStandard){
+            if (myNudgeVersion == NudgeSDK.NudgeVersion.nudgeStandard){
                 myNudge?.setFederationId(federationId: formatedFederationId)
-            } else if (myNudgeVersion == Nudge.NudgeVersion.nudgeGeo){
+            } else if (myNudgeVersion == NudgeSDK.NudgeVersion.nudgeGeo){
                 myNudge?.setFederationId(federationId: formatedFederationId)
             } else {
                 logger.debug(message: "nudge version is not specified")
@@ -146,9 +160,10 @@ private let fileName = "Nudge.swift"
         
     }
     
+    #if GEO_ENABLED
     @objc public func registerForLocationServices(showLocationDialog: Bool) {
-        
-        if (myNudgeVersion == Nudge.NudgeVersion.nudgeGeo && (KeyValueStore.getString(key: KeyValueStore.notificationPermission) == "Accept")){
+
+        if (myNudgeVersion == NudgeSDK.NudgeVersion.nudgeGeo && (KeyValueStore.getString(key: KeyValueStore.notificationPermission) == "Accept")){
             if let myNudgeGeo = myNudge as? NudgeGeo {
                 KeyValueStore.putBoolean(key: KeyValueStore.showLocationDialog, value: showLocationDialog)
                 myNudgeGeo.registerForLocationServices()
@@ -157,6 +172,7 @@ private let fileName = "Nudge.swift"
             logger.debug(message: "This feature is only available in the Geo version of nudge")
         }
     }
+    #endif
     
     @objc public func setNudgeEnabled(isNudgeEnabled: Bool){
         if (myNudge != nil){
@@ -193,7 +209,7 @@ private let fileName = "Nudge.swift"
             }
         } else {
 //            NudgeAnalytics.trackError(error: "Unsupported version of iOS", file: fileName, function: "registerForPushNotifications")
-            throw Nudge.NudgeErrors.unsupportediOSVersion
+            throw NudgeSDK.NudgeErrors.unsupportediOSVersion
         }
     }
     
@@ -235,25 +251,96 @@ private let fileName = "Nudge.swift"
     @MainActor @available(iOS 10.0, *)
     @objc public static func tappedNotification(notification: UNNotification) {
         NudgeBase.trackMessageEvent(endpointName: Constants.Core.Endpoints.nudgeTapped, notificationPayload: notification.request.content.userInfo)
-        let isDeepLink = notification.request.content.userInfo[KeyValueStore.MessageData.isDeepLink] as? Bool ?? false
-        if let url = (notification.request.content.userInfo[KeyValueStore.MessageData.messageUrl] as? String), !isDeepLink {
-            redirectToUrl(messageUrl: url)
-            NSLog("nudge tapped - redirecting to url")
+        if let urlString = (notification.request.content.userInfo[KeyValueStore.MessageData.messageUrl] as? String),
+           let url = URL(string: urlString) {
+            if isAssociatedDomainLink(url) {
+                // This URL belongs to the host app's own domain — leave routing to
+                // the host app's own navigation code; it already knows how.
+                NSLog("nudge tapped - associated domain link, leaving routing to host app")
+            } else {
+                redirectToUrl(messageUrl: urlString)
+                NSLog("nudge tapped - redirecting to url")
+            }
         }
         else {
             NSLog("nudge tapped")
         }
     }
-    
+
+    // Whether the given URL's host matches one of the host app's own Associated
+    // Domains entitlements. Lets a host app's own module decide to route a tapped
+    // link in-app (e.g. via its own navigation API) without requiring any flag from
+    // the integrator — this reads the same entitlement already required for real
+    // Universal Links to work at all.
+    @objc public static func isAssociatedDomainLink(_ url: URL) -> Bool {
+        guard let host = url.host?.lowercased() else { return false }
+        return associatedDomains().contains { domain in
+            host == domain || host.hasSuffix("." + domain)
+        }
+    }
+
+    private static var cachedAssociatedDomains: [String]?
+
+    private static func associatedDomains() -> [String] {
+        if let cached = cachedAssociatedDomains { return cached }
+        let domains = loadAssociatedDomainsFromExecutable()
+        cachedAssociatedDomains = domains
+        return domains
+    }
+
+    // The Associated Domains entitlement is baked into the app's executable at
+    // signing time (code-signature blob on device, __entitlements section on
+    // simulator), and iOS has no public API to query it (SecTask is macOS-only).
+    // So read our own binary and pull the embedded entitlements plist out directly.
+    private static func loadAssociatedDomainsFromExecutable() -> [String] {
+        guard let execURL = Bundle.main.executableURL,
+              let data = try? Data(contentsOf: execURL, options: .alwaysMapped) else { return [] }
+
+        guard let keyRange = data.range(of: Data("com.apple.developer.associated-domains".utf8)) else { return [] }
+
+        // Extract the plist that encloses the key.
+        guard let startRange = data.range(of: Data("<?xml".utf8), options: .backwards, in: 0..<keyRange.lowerBound),
+              let endRange = data.range(of: Data("</plist>".utf8), in: keyRange.upperBound..<data.count) else { return [] }
+
+        let plistData = data.subdata(in: startRange.lowerBound..<endRange.upperBound)
+        guard let plist = try? PropertyListSerialization.propertyList(from: plistData, options: [], format: nil) as? [String: Any],
+              let entries = plist["com.apple.developer.associated-domains"] as? [String] else { return [] }
+
+        return entries.compactMap { entry in
+            entry
+                .replacingOccurrences(of: "applinks:", with: "")
+                .components(separatedBy: "?")
+                .first?
+                .lowercased()
+        }
+    }
+
     @MainActor
     private static func redirectToUrl(messageUrl: String) {
         guard let url = URL(string: messageUrl) else { return }
 
-        // Try universal link first — opens in the host app if registered for this URL
-        UIApplication.shared.open(url, options: [.universalLinksOnly: true]) { success in
-            if !success {
-                // Not a universal link, open normally (Safari)
-                UIApplication.shared.open(url, options: [:], completionHandler: nil)
+        func attemptOpen() {
+            // Not this app's own domain — let iOS resolve it normally: another
+            // installed app registered for this universal link, or Safari.
+            UIApplication.shared.open(url, options: [.universalLinksOnly: true]) { success in
+                if !success {
+                    // Not a universal link, open normally (Safari)
+                    UIApplication.shared.open(url, options: [:], completionHandler: nil)
+                }
+            }
+        }
+
+        if UIApplication.shared.applicationState == .active {
+            attemptOpen()
+        } else {
+            // One-shot: remove the observer as soon as it fires, otherwise every
+            // future foregrounding of the app would re-open the same stale link.
+            var token: NSObjectProtocol?
+            token = NotificationCenter.default.addObserver(forName: UIApplication.didBecomeActiveNotification, object: nil, queue: .main) { _ in
+                if let token = token {
+                    NotificationCenter.default.removeObserver(token)
+                }
+                attemptOpen()
             }
         }
     }
@@ -345,7 +432,9 @@ private let fileName = "Nudge.swift"
 }
 
 @objc public class NudgeVersionBridge: NSObject {
-    public static let nudgeBase = Nudge.NudgeVersion.nudgeStandard
-    public static let nudgeGeo = Nudge.NudgeVersion.nudgeGeo
-    public static let nudgeLegacy = Nudge.NudgeVersion.nudgeLegacy
+    public static let nudgeBase = NudgeSDK.NudgeVersion.nudgeStandard
+    public static let nudgeGeo = NudgeSDK.NudgeVersion.nudgeGeo
+    public static let nudgeLegacy = NudgeSDK.NudgeVersion.nudgeLegacy
 }
+
+public typealias Nudge = NudgeSDK

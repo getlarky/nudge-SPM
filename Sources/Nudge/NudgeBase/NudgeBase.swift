@@ -6,9 +6,15 @@
 
 import UserNotifications
 import MessageUI
+import UIKit
 
 
 private let fileName = "NudgeBase.swift"
+
+// Mutated only while holding NudgeBase.backgroundTaskQueue, so @unchecked Sendable is safe here.
+private final class BackgroundTaskBox: @unchecked Sendable {
+    var identifier: UIBackgroundTaskIdentifier = .invalid
+}
 
 @objc(NudgeBase)
 open class NudgeBase : NSObject, @unchecked Sendable {
@@ -31,7 +37,7 @@ open class NudgeBase : NSObject, @unchecked Sendable {
             KeyValueStore.isNudgeEnabled: false,
             KeyValueStore.showLocationDialog: false,
             KeyValueStore.orgDesiredAccuracy: 2,
-            KeyValueStore.orgDistanceFilter: 25.0,
+            KeyValueStore.orgDistanceFilter: 75.0,
             KeyValueStore.lastPermissionsPromptTime: 0.0,
             KeyValueStore.howManyTimesPrompted: 0,
             "location_permission": "Not Applicable"
@@ -42,7 +48,7 @@ open class NudgeBase : NSObject, @unchecked Sendable {
         let enabled = options["enabled"] != nil ? options["enabled"] as! Bool : false
         let federationId = options["federationId"] != nil ? (options["federationId"] as! String).trimmingCharacters(in: .whitespacesAndNewlines) : ""
         
-        let nudgeVersion = options["nudgeVersion"] != nil ? options["nudgeVersion"] as! Nudge.NudgeVersion : Nudge.NudgeVersion.nudgeStandard
+        let nudgeVersion = options["nudgeVersion"] != nil ? options["nudgeVersion"] as! NudgeSDK.NudgeVersion : NudgeSDK.NudgeVersion.nudgeStandard
         
         KeyValueStore.putString(key: KeyValueStore.apiKey, value: apiKey)
         KeyValueStore.putBoolean(key: KeyValueStore.isNudgeEnabled, value: enabled)
@@ -441,7 +447,32 @@ open class NudgeBase : NSObject, @unchecked Sendable {
         })
     }
     
+    // Notification-tap/receipt tracking races against the host app's completionHandler(),
+    // which iOS treats as a signal that it's free to suspend the process — without this,
+    // the async POST below can get torn down mid-flight before it ever reaches the backend.
+    // beginBackgroundTask buys it a grace period to finish regardless of what the host app does.
+    private static let backgroundTaskQueue = DispatchQueue(label: "com.larky.nudge.trackMessageEvent.backgroundTask")
+
     public static func trackMessageEvent(endpointName: String, notificationPayload: [AnyHashable:Any]){
+        let backgroundTask = BackgroundTaskBox()
+        backgroundTask.identifier = UIApplication.shared.beginBackgroundTask(withName: "NudgeTrackMessageEvent") {
+            backgroundTaskQueue.sync {
+                if backgroundTask.identifier != .invalid {
+                    UIApplication.shared.endBackgroundTask(backgroundTask.identifier)
+                    backgroundTask.identifier = .invalid
+                }
+            }
+        }
+
+        func endBackgroundTaskIfNeeded() {
+            backgroundTaskQueue.sync {
+                if backgroundTask.identifier != .invalid {
+                    UIApplication.shared.endBackgroundTask(backgroundTask.identifier)
+                    backgroundTask.identifier = .invalid
+                }
+            }
+        }
+
         let userId = KeyValueStore.getString(key: KeyValueStore.userId)
         let deviceId = KeyValueStore.getString(key: KeyValueStore.deviceId)
         let orgId = KeyValueStore.getString(key: KeyValueStore.organizationId)
@@ -472,12 +503,14 @@ open class NudgeBase : NSObject, @unchecked Sendable {
         
         HttpClientApi.instance().makeAPICall(url: url, params:postDataParams, method: .POST,
                                              success: { (data, response, error) in
-            
+
             print("trackMessageData call successful")
-            
+            endBackgroundTaskIfNeeded()
+
         }, failure: { (data, response, error) in
             NudgeBase.logger.errorNudgeMessaging(message: "trackMessageData failure \(response?.statusCode)")
-            
+            endBackgroundTaskIfNeeded()
+
         })
     }
     

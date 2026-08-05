@@ -7,6 +7,8 @@
 
 // Needs debugging
 
+#if GEO_ENABLED
+
 import Foundation
 import CoreLocation
 import UIKit
@@ -236,4 +238,6 @@ func checkIfLocationServicesEnabled() -> Bool {
     NudgeGeo.logger.debugLocationTracking(message: "Location Services Enabled")
     return true
 }
+
+#endif
 

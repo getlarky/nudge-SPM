@@ -20,9 +20,18 @@ private let fileName = "HttpClientApi.swift"
 
 open class HttpClientApi: NSObject, @unchecked Sendable{
     //TODO: remove app transport security arbitary constant from info.plist file once we get API"s
-    var request : URLRequest?
-    var session : URLSession?
-    
+
+    // Shared and never invalidated for the process lifetime — a session created fresh per call
+    // and stored only on a throwaway HttpClientApi instance has nothing keeping it retained once
+    // makeAPICall returns, which is fragile exactly when a caller (e.g. notification tracking)
+    // doesn't hold onto the instance itself.
+    private static let sharedSession: URLSession = {
+        let configuration = URLSessionConfiguration.default
+        configuration.timeoutIntervalForRequest = 30
+        configuration.timeoutIntervalForResource = 30
+        return URLSession(configuration: configuration)
+    }()
+
     let tokenPayload = [
         "client_id": "ios",
         "client_secret": "293bfbf06b93e943b32341e359fe695ef3e245d8e5d5bb9ee852ba08b5aef64a",
@@ -72,39 +81,27 @@ open class HttpClientApi: NSObject, @unchecked Sendable{
             return
         }
         print("makeAPICall for url: " + url)
-        
-        request = URLRequest(url: requestURL)
+
+        var request = URLRequest(url: requestURL)
         // let serverInfo = getAudienceFromUrl(url: url)
-        
+
         let paramsPayload = params?.paramsData
-        
-        
+
+
         // Tokendealer auth may be obsolete — commented out pending confirmation
 //        if let token = serverInfo.token {
-//            request?.setValue(KeyValueStore.bearer + " " + token, forHTTPHeaderField: KeyValueStore.authorizationHeader)
+//            request.setValue(KeyValueStore.bearer + " " + token, forHTTPHeaderField: KeyValueStore.authorizationHeader)
 //        }
-        request?.setValue(KeyValueStore.nudgeLibraryVersion,forHTTPHeaderField: KeyValueStore.nudgeLibraryVersionHeader)
+        request.setValue(KeyValueStore.nudgeLibraryVersion,forHTTPHeaderField: KeyValueStore.nudgeLibraryVersionHeader)
         if let params = paramsPayload {
             let  jsonData = try? JSONSerialization.data(withJSONObject: params, options: .prettyPrinted)
-            request?.setValue(KeyValueStore.applicationJson, forHTTPHeaderField: KeyValueStore.contentType)
-            request?.httpBody = jsonData
+            request.setValue(KeyValueStore.applicationJson, forHTTPHeaderField: KeyValueStore.contentType)
+            request.httpBody = jsonData
 
         }
-        request?.httpMethod = method.rawValue
-        
-        
-        let configuration = URLSessionConfiguration.default
-        
-        configuration.timeoutIntervalForRequest = 30
-        configuration.timeoutIntervalForResource = 30
-        
-        session = URLSession(configuration: configuration)
-        
-        guard let request = request else {
-            NSLog("API Call failure: No request found")
-            return
-        }
-        session?.dataTask(with: request as URLRequest) { (data, response, error) -> Void in
+        request.httpMethod = method.rawValue
+
+        HttpClientApi.sharedSession.dataTask(with: request) { (data, response, error) -> Void in
             
             if let data = data {
                 

@@ -1,3 +1,5 @@
+#if GEO_ENABLED
+
 import UserNotifications
 import CoreLocation
 import MessageUI
@@ -34,7 +36,7 @@ public class NudgeGeo : NudgeBase {
         let enabled = options["enabled"] != nil ? options["enabled"] as! Bool : false
         let federationId = options["federationId"] != nil ? (options["federationId"] as! String).trimmingCharacters(in: .whitespacesAndNewlines) : ""
         let showLocationDialog = options["showLocationDialog"] != nil ? options["showLocationDialog"] as! Bool : true
-        let nudgeVersion = options["nudgeVersion"] != nil ? options["nudgeVersion"] as! Nudge.NudgeVersion : Nudge.NudgeVersion.nudgeGeo
+        let nudgeVersion = options["nudgeVersion"] != nil ? options["nudgeVersion"] as! NudgeSDK.NudgeVersion : NudgeSDK.NudgeVersion.nudgeGeo
         
         KeyValueStore.putString(key: KeyValueStore.apiKey, value: apiKey)
         KeyValueStore.putBoolean(key: KeyValueStore.isNudgeEnabled, value: enabled)
@@ -76,7 +78,7 @@ public class NudgeGeo : NudgeBase {
             NudgeGeo.registerToken(deviceId: newDeviceId, token: APNtoken, bundleId: NudgeBase.bundleId, success: {() in
                 KeyValueStore.putString(key: KeyValueStore.APNtoken, value: APNtoken)
                 let nudgeVersionValue = KeyValueStore.getString(key: KeyValueStore.nudgeVersion)
-                let nudgeVersion = Nudge.NudgeVersion(rawValue: nudgeVersionValue ?? "nudgeGeo")
+                let nudgeVersion = NudgeSDK.NudgeVersion(rawValue: nudgeVersionValue ?? "nudgeGeo")
                 
                 let locationPermissionStatus = KeyValueStore.getString(key: KeyValueStore.locationPermission)
                 print("location: \(locationPermissionStatus)")
@@ -153,9 +155,11 @@ public class NudgeGeo : NudgeBase {
             
         }, failure: { (_, response, _) in
             NudgeBase.logger.errorNudgePermissions(message: "Nudge setNudgeLocationPermissions failed: \(response?.statusCode)")
-            
+
         })
     }
-    
+
 }
+
+#endif
 
