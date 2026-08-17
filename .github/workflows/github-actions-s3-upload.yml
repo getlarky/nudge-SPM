@@ -1,0 +1,24 @@
+name: Mirror repo to S3
+on:
+  push:
+    branches:
+      - newprod
+      - prod
+  workflow_dispatch:
+jobs:
+  s3Backup:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v3
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          audience: sts.amazonaws.com
+          aws-region: us-east-2
+          role-to-assume: arn:aws:iam::421718464424:role/gh-getlarky-role
+      - name: S3 Backup
+        run: |
+          aws s3 sync . s3://gh-getlarky-backup/${{github.event.repository.name}}
